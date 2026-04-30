@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>Timbangan Kertas - Professional</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Fallback jika CSS external tidak terload */
+    body { background: #e0e7ff; font-family: Arial, sans-serif; margin: 0; padding: 12px; }
+  </style>
 </head>
 <body>
 <div class="container">
@@ -19,16 +23,16 @@
       <h1>📦 TIMBANG 1 BOX KERTAS</h1>
       <div class="note">✅ Bundles dibulatkan KE ATAS | PO & Brand TETAP setelah simpan</div>
 
-      <label>📅 Tanggal</label>
+      <label for="tanggal">📅 Tanggal</label>
       <input type="date" id="tanggal">
 
-      <label>📄 No. PO</label>
+      <label for="noPo">📄 No. PO</label>
       <input type="text" id="noPo" placeholder="PO-001">
 
-      <label>🏷️ Brand</label>
+      <label for="brand">🏷️ Brand</label>
       <input type="text" id="brand" placeholder="Contoh: RONSON, ROYO">
 
-      <label>📏 Size Kertas</label>
+      <label for="size">📏 Size Kertas</label>
       <select id="size">
         <option value="SINGLE 36X69">SINGLE 36X69</option>
         <option value="1 1/4 44X78">1 1/4 44X78</option>
@@ -41,29 +45,41 @@
       </select>
 
       <div class="row-2">
-        <div><label>📄 GSM</label><select id="gsm">
-          <option value="13">13</option><option value="14">14</option>
-          <option value="20">20</option><option value="35">35</option>
-        </select></div>
-        <div><label>📑 Leaves/Bundle</label><select id="leaves">
-          <option value="32">32</option><option value="33">33</option><option value="34">34</option>
-          <option value="35">35</option><option value="40">40</option><option value="42">42</option>
-          <option value="50">50</option><option value="51">51</option><option value="52">52</option>
-          <option value="60">60</option>
-        </select></div>
+        <div>
+          <label for="gsm">📄 GSM</label>
+          <select id="gsm">
+            <option value="13">13</option><option value="14">14</option>
+            <option value="20">20</option><option value="35">35</option>
+          </select>
+        </div>
+        <div>
+          <label for="leaves">📑 Leaves/Bundle</label>
+          <select id="leaves">
+            <option value="32">32</option><option value="33">33</option><option value="34">34</option>
+            <option value="35">35</option><option value="40">40</option><option value="42">42</option>
+            <option value="50">50</option><option value="51">51</option><option value="52">52</option>
+            <option value="60">60</option>
+          </select>
+        </div>
       </div>
 
       <div class="row-2">
-        <div><label>📦 Jenis Box</label><select id="box">
-          <option value="White">White (0.90 kg)</option>
-          <option value="White New">White New (0.80 kg)</option>
-          <option value="Grey">Grey (1.25 kg)</option>
-          <option value="Green Jumbo">Green Jumbo (3.80 kg)</option>
-        </select></div>
-        <div><label>📚 Jumlah Layer</label><input type="number" id="layer" step="1" value="0"></div>
+        <div>
+          <label for="box">📦 Jenis Box</label>
+          <select id="box">
+            <option value="White">White (0.90 kg)</option>
+            <option value="White New">White New (0.80 kg)</option>
+            <option value="Grey">Grey (1.25 kg)</option>
+            <option value="Green Jumbo">Green Jumbo (3.80 kg)</option>
+          </select>
+        </div>
+        <div>
+          <label for="layer">📚 Jumlah Layer</label>
+          <input type="number" id="layer" step="1" value="0">
+        </div>
       </div>
 
-      <label>⚖️ Berat TIMBANG 1 BOX (kg)</label>
+      <label for="berat">⚖️ Berat TIMBANG 1 BOX (kg)</label>
       <input type="number" id="berat" step="0.01" placeholder="Contoh: 2.50">
 
       <button id="hitungBtn">✅ HITUNG & SIMPAN KE CLOUD</button>
@@ -115,7 +131,7 @@
   <div class="modal-content">
     <h3>🖨️ Cetak Multi Timbang</h3>
     <div class="cetak-option">
-      <label>Pilih Metode Cetak:</label>
+      <label for="cetakMetode">Pilih Metode Cetak:</label>
       <select id="cetakMetode">
         <option value="po">📦 Cetak per No. PO</option>
         <option value="brand">🏷️ Cetak per Brand</option>
@@ -125,11 +141,11 @@
       </select>
     </div>
     <div id="cetakPoInput" class="cetak-option">
-      <label>Masukkan No. PO:</label>
+      <label for="cetakPoValue">Masukkan No. PO:</label>
       <input type="text" id="cetakPoValue" placeholder="Contoh: PO-001">
     </div>
     <div id="cetakBrandInput" class="cetak-option" style="display:none;">
-      <label>Masukkan Brand:</label>
+      <label for="cetakBrandValue">Masukkan Brand:</label>
       <input type="text" id="cetakBrandValue" placeholder="Contoh: RONSON">
     </div>
     <div id="cetakTanggalInput" class="cetak-option" style="display:none;">
@@ -145,13 +161,13 @@
 <div id="editModal" class="modal">
   <div class="modal-content">
     <h3>✏️ Edit Data</h3>
-    <label>Tanggal</label>
+    <label for="editTanggal">Tanggal</label>
     <input type="date" id="editTanggal">
-    <label>No. PO</label>
+    <label for="editNoPo">No. PO</label>
     <input type="text" id="editNoPo">
-    <label>Brand</label>
+    <label for="editBrand">Brand</label>
     <input type="text" id="editBrand">
-    <label>Size Kertas</label>
+    <label for="editSize">Size Kertas</label>
     <select id="editSize">
       <option value="SINGLE 36X69">SINGLE 36X69</option>
       <option value="1 1/4 44X78">1 1/4 44X78</option>
@@ -162,14 +178,14 @@
       <option value="SKS 54X108">SKS 54X108</option>
       <option value="CLEAR PAPER SKS 54X108">CLEAR PAPER SKS 54X108</option>
     </select>
-    <label>GSM</label>
+    <label for="editGsm">GSM</label>
     <select id="editGsm"><option value="13">13</option><option value="14">14</option><option value="20">20</option><option value="35">35</option></select>
-    <label>Jenis Box</label>
+    <label for="editBox">Jenis Box</label>
     <select id="editBox">
       <option value="White">White</option><option value="White New">White New</option>
       <option value="Grey">Grey</option><option value="Green Jumbo">Green Jumbo</option>
     </select>
-    <label>Jumlah Bundles</label>
+    <label for="editBundles">Jumlah Bundles</label>
     <input type="number" id="editBundles" step="1">
     <button id="saveEditBtn">💾 Simpan Perubahan</button>
     <button id="closeModalBtn" class="close-modal">❌ Batal</button>
