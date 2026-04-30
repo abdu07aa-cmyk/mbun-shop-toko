@@ -1,0 +1,332 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #e0e7ff;
+  font-family: Arial, sans-serif;
+  padding: 12px;
+}
+
+.container {
+  max-width: 650px;
+  margin: 0 auto;
+}
+
+.card {
+  background: white;
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+h1 {
+  font-size: 1.3rem;
+  color: #1e3a8a;
+  text-align: center;
+}
+
+h2 {
+  font-size: 1.1rem;
+  color: #1e3a8a;
+  margin-bottom: 12px;
+}
+
+.tab-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px;
+  background: #cbd5e1;
+  border-radius: 40px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: #1e3a8a;
+  color: white;
+}
+
+.page {
+  display: none;
+}
+
+.page.active-page {
+  display: block;
+}
+
+label {
+  font-weight: bold;
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 5px;
+  font-size: 0.85rem;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #ccc;
+}
+
+button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 40px;
+  width: 100%;
+  margin-top: 16px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.btn-reset {
+  background: #64748b;
+  margin-top: 8px;
+}
+
+.btn-hapus {
+  background: #ef4444;
+  margin-top: 8px;
+}
+
+.btn-export {
+  background: #10b981;
+}
+
+.btn-cetak {
+  background: #8b5cf6;
+}
+
+.btn-urut {
+  background: #06b6d4;
+  margin-top: 8px;
+}
+
+.btn-reset-cari {
+  background: #64748b;
+  margin-top: 0;
+  border: none;
+  border-radius: 40px;
+  padding: 10px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-edit-small {
+  background: #f59e0b;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  width: auto;
+  margin: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  color: white;
+  border: none;
+}
+
+.btn-hapus-small {
+  background: #ef4444;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  width: auto;
+  margin: 0 0 0 4px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: white;
+  border: none;
+}
+
+.row-2 {
+  display: flex;
+  gap: 12px;
+}
+
+.row-2 > div {
+  flex: 1;
+}
+
+.berat-bersih {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #1e3a8a;
+}
+
+.search-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.search-row input {
+  flex: 2;
+  margin-top: 0;
+}
+
+.search-row button {
+  flex: 1;
+  margin-top: 0;
+}
+
+.note {
+  background: #dbeafe;
+  padding: 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  margin-bottom: 12px;
+}
+
+.status {
+  font-size: 0.7rem;
+  text-align: center;
+  padding: 6px;
+  border-radius: 10px;
+  margin-top: 8px;
+}
+
+.status.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status.loading {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.7rem;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 6px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+th {
+  background: #e2e8f0;
+}
+
+.aksi-cell {
+  white-space: nowrap;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.pagination button {
+  width: auto;
+  padding: 5px 10px;
+  margin-top: 0;
+  background: #e2e8f0;
+  color: black;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.pagination button.active-page-btn {
+  background: #1e3a8a;
+  color: white;
+}
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-content h3 {
+  margin-bottom: 16px;
+  color: #1e3a8a;
+}
+
+.close-modal {
+  background: #64748b;
+  margin-top: 16px;
+}
+
+.cetak-option {
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #f1f5f9;
+  border-radius: 12px;
+}
+
+.cetak-option label {
+  margin-top: 0;
+}
+
+.cetak-option select, .cetak-option input {
+  margin-top: 5px;
+}
+
+/* Print Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+  }
+  .no-print {
+    display: none;
+  }
+  button {
+    display: none;
+  }
+}
