@@ -16,12 +16,16 @@
       <span class="topbar-logo">🛍️</span>
       <div>
         <h1>MBUN COLLECTION</h1>
-        <span>Belanja Hemat, Hidup Nikmat</span>
+        <span>Belanja Online • Ambil Sendiri atau Diantar</span>
       </div>
     </div>
     <div class="topbar-actions">
+      <button class="icon-btn" id="adminToggleBtn" aria-label="Admin" title="Admin Panel">
+        <i class="fa-solid fa-user-shield"></i>
+      </button>
       <button class="icon-btn" id="ordersBtn" aria-label="Pesanan Saya" title="Pesanan Saya">
         <i class="fa-solid fa-receipt"></i>
+        <span id="orderStatusBadge" class="badge" hidden>0</span>
       </button>
       <button class="icon-btn" id="cartBtn" aria-label="Keranjang" title="Keranjang">
         <i class="fa-solid fa-cart-shopping"></i>
@@ -29,6 +33,9 @@
       </button>
     </div>
   </header>
+
+  <!-- ============== PROMO BANNER ============== -->
+  <div id="promoContainer" class="promo-container"></div>
 
   <!-- ============== SEARCH & CATEGORY ============== -->
   <div class="toolbar">
@@ -83,6 +90,21 @@
       <button class="icon-btn" id="closeOrdersBtn"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="drawer-body" id="ordersBody"></div>
+  </aside>
+
+  <!-- ============== ADMIN PANEL DRAWER ============== -->
+  <div class="drawer-overlay" id="adminOverlay"></div>
+  <aside class="drawer" id="adminPanel">
+    <div class="drawer-header">
+      <h2><i class="fa-solid fa-user-shield"></i> Admin Panel</h2>
+      <button class="icon-btn" id="closeAdminBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="drawer-body" id="adminProductList">
+      <div class="empty-state">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <p>Memuat data...</p>
+      </div>
+    </div>
   </aside>
 
   <!-- ============== TOAST ============== -->
