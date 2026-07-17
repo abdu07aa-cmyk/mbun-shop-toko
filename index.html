@@ -10,7 +10,6 @@
 </head>
 <body>
 
-  <!-- ============== HEADER ============== -->
   <header class="topbar">
     <div class="topbar-brand">
       <span class="topbar-logo">🛍️</span>
@@ -20,32 +19,26 @@
       </div>
     </div>
     <div class="topbar-actions">
-      <!-- ADMIN ORDERS (untuk lihat pesanan masuk) -->
-      <button class="icon-btn" id="adminOrdersBtn" aria-label="Admin Pesanan" title="Kelola Pesanan">
+      <button class="icon-btn" id="adminOrdersBtn" title="Kelola Pesanan">
         <i class="fa-solid fa-clipboard-list"></i>
         <span id="adminOrdersBadge" class="badge" hidden>0</span>
       </button>
-      <!-- ADMIN PRODUK (untuk kelola produk) -->
-      <button class="icon-btn" id="adminToggleBtn" aria-label="Admin Produk" title="Kelola Produk">
+      <button class="icon-btn" id="adminToggleBtn" title="Kelola Produk">
         <i class="fa-solid fa-boxes"></i>
       </button>
-      <!-- PESANAN SAYA -->
-      <button class="icon-btn" id="ordersBtn" aria-label="Pesanan Saya" title="Pesanan Saya">
+      <button class="icon-btn" id="ordersBtn" title="Pesanan Saya">
         <i class="fa-solid fa-receipt"></i>
         <span id="orderStatusBadge" class="badge" hidden>0</span>
       </button>
-      <!-- KERANJANG -->
-      <button class="icon-btn" id="cartBtn" aria-label="Keranjang" title="Keranjang">
+      <button class="icon-btn" id="cartBtn" title="Keranjang">
         <i class="fa-solid fa-cart-shopping"></i>
         <span id="cartBadge" class="badge" hidden>0</span>
       </button>
     </div>
   </header>
 
-  <!-- ============== PROMO BANNER ============== -->
   <div id="promoContainer" class="promo-container"></div>
 
-  <!-- ============== SEARCH & CATEGORY ============== -->
   <div class="toolbar">
     <div class="search-box">
       <i class="fa-solid fa-search"></i>
@@ -54,7 +47,6 @@
     <div class="category-pills" id="categoryPills"></div>
   </div>
 
-  <!-- ============== KATALOG PRODUK ============== -->
   <main id="catalogView">
     <div class="product-grid" id="productGrid"></div>
     <div id="catalogEmpty" class="empty-state" hidden>
@@ -63,7 +55,7 @@
     </div>
   </main>
 
-  <!-- ============== CART DRAWER ============== -->
+  <!-- CART -->
   <div class="drawer-overlay" id="cartOverlay"></div>
   <aside class="drawer" id="cartDrawer">
     <div class="drawer-header">
@@ -80,7 +72,7 @@
     </div>
   </aside>
 
-  <!-- ============== CHECKOUT DRAWER ============== -->
+  <!-- CHECKOUT -->
   <div class="drawer-overlay" id="checkoutOverlay"></div>
   <aside class="drawer" id="checkoutDrawer">
     <div class="drawer-header">
@@ -90,7 +82,7 @@
     <div class="drawer-body" id="checkoutBody"></div>
   </aside>
 
-  <!-- ============== RIWAYAT PESANAN DRAWER ============== -->
+  <!-- ORDERS -->
   <div class="drawer-overlay" id="ordersOverlay"></div>
   <aside class="drawer" id="ordersDrawer">
     <div class="drawer-header">
@@ -100,7 +92,7 @@
     <div class="drawer-body" id="ordersBody"></div>
   </aside>
 
-  <!-- ============== ADMIN PRODUK DRAWER ============== -->
+  <!-- ADMIN PRODUK -->
   <div class="drawer-overlay" id="adminOverlay"></div>
   <aside class="drawer" id="adminPanel">
     <div class="drawer-header">
@@ -108,14 +100,11 @@
       <button class="icon-btn" id="closeAdminBtn"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="drawer-body" id="adminProductList">
-      <div class="empty-state">
-        <i class="fa-solid fa-spinner fa-spin"></i>
-        <p>Memuat data...</p>
-      </div>
+      <div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Memuat data...</p></div>
     </div>
   </aside>
 
-  <!-- ============== ADMIN PESANAN DRAWER ============== -->
+  <!-- ADMIN PESANAN -->
   <div class="drawer-overlay" id="adminOrdersOverlay"></div>
   <aside class="drawer drawer-wide" id="adminOrdersDrawer">
     <div class="drawer-header">
@@ -123,17 +112,11 @@
       <button class="icon-btn" id="closeAdminOrdersBtn"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="drawer-body" id="adminOrdersContent">
-      <div class="empty-state">
-        <i class="fa-solid fa-spinner fa-spin"></i>
-        <p>Memuat pesanan...</p>
-      </div>
+      <div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Memuat pesanan...</p></div>
     </div>
   </aside>
 
-  <!-- ============== TOAST ============== -->
   <div class="toast-container" id="toastContainer"></div>
-
-  <!-- ============== LOADING OVERLAY ============== -->
   <div class="loading-overlay" id="loadingOverlay" hidden>
     <div class="spinner"></div>
   </div>
