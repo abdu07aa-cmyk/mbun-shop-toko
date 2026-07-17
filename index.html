@@ -20,13 +20,21 @@
       </div>
     </div>
     <div class="topbar-actions">
-      <button class="icon-btn" id="adminToggleBtn" aria-label="Admin" title="Admin Panel">
-        <i class="fa-solid fa-user-shield"></i>
+      <!-- ADMIN ORDERS (untuk lihat pesanan masuk) -->
+      <button class="icon-btn" id="adminOrdersBtn" aria-label="Admin Pesanan" title="Kelola Pesanan">
+        <i class="fa-solid fa-clipboard-list"></i>
+        <span id="adminOrdersBadge" class="badge" hidden>0</span>
       </button>
+      <!-- ADMIN PRODUK (untuk kelola produk) -->
+      <button class="icon-btn" id="adminToggleBtn" aria-label="Admin Produk" title="Kelola Produk">
+        <i class="fa-solid fa-boxes"></i>
+      </button>
+      <!-- PESANAN SAYA -->
       <button class="icon-btn" id="ordersBtn" aria-label="Pesanan Saya" title="Pesanan Saya">
         <i class="fa-solid fa-receipt"></i>
         <span id="orderStatusBadge" class="badge" hidden>0</span>
       </button>
+      <!-- KERANJANG -->
       <button class="icon-btn" id="cartBtn" aria-label="Keranjang" title="Keranjang">
         <i class="fa-solid fa-cart-shopping"></i>
         <span id="cartBadge" class="badge" hidden>0</span>
@@ -92,17 +100,32 @@
     <div class="drawer-body" id="ordersBody"></div>
   </aside>
 
-  <!-- ============== ADMIN PANEL DRAWER ============== -->
+  <!-- ============== ADMIN PRODUK DRAWER ============== -->
   <div class="drawer-overlay" id="adminOverlay"></div>
   <aside class="drawer" id="adminPanel">
     <div class="drawer-header">
-      <h2><i class="fa-solid fa-user-shield"></i> Admin Panel</h2>
+      <h2><i class="fa-solid fa-boxes"></i> Kelola Produk</h2>
       <button class="icon-btn" id="closeAdminBtn"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="drawer-body" id="adminProductList">
       <div class="empty-state">
         <i class="fa-solid fa-spinner fa-spin"></i>
         <p>Memuat data...</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============== ADMIN PESANAN DRAWER ============== -->
+  <div class="drawer-overlay" id="adminOrdersOverlay"></div>
+  <aside class="drawer drawer-wide" id="adminOrdersDrawer">
+    <div class="drawer-header">
+      <h2><i class="fa-solid fa-clipboard-list"></i> Kelola Pesanan</h2>
+      <button class="icon-btn" id="closeAdminOrdersBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="drawer-body" id="adminOrdersContent">
+      <div class="empty-state">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <p>Memuat pesanan...</p>
       </div>
     </div>
   </aside>
