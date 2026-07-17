@@ -1,7 +1,5 @@
 /* =====================================================
    MBUN COLLECTION — TOKO ONLINE — APP.JS (FINAL)
-   Aplikasi belanja terpisah untuk pelanggan, terhubung ke
-   Supabase project yang SAMA dengan aplikasi kasir internal
    ===================================================== */
 
 /* ---------- KONFIGURASI ---------- */
@@ -24,6 +22,7 @@ const CONFIG = {
     SUPABASE_KEY: 'toko_supabase_key',
     ORDER_STATUSES: 'order_statuses',
   },
+  ADMIN_PASSWORD: 'mbun123', // Ganti password admin di sini
 };
 
 CONFIG.SUPABASE_REST_URL = `${CONFIG.SUPABASE_URL}/rest/v1`;
@@ -232,7 +231,6 @@ const Promo = {
   
   async loadPromos() {
     try {
-      // Coba load promo dari Supabase (opsional)
       const result = await API.fetchAll('promos', {
         status: 'eq.active',
         limit: 5
@@ -360,7 +358,6 @@ const Catalog = {
       card.addEventListener('click', () => Cart.addItem(card.dataset.addProduct));
     });
 
-    // Lazy load images
     const lazyImages = grid.querySelectorAll('.lazy-image');
     if (lazyImages.length) LazyLoader.observe(lazyImages);
   },
@@ -512,7 +509,6 @@ const Checkout = {
       return;
     }
 
-    // Hitung diskon
     const discountResult = Promo.applyDiscount(STATE.cartTotal);
     const { discount, promo, totalAfterDiscount } = discountResult;
 
@@ -764,7 +760,6 @@ const OrderStatus = {
         }
       }
 
-      // Cek perubahan status untuk notifikasi
       const previousStatuses = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.ORDER_STATUSES) || '{}');
       let hasChange = false;
 
@@ -799,7 +794,7 @@ const OrderStatus = {
   }
 };
 
-/* ---------- ADMIN ---------- */
+/* ---------- ADMIN PRODUK ---------- */
 const Admin = {
   isAdminMode: false,
   
@@ -850,9 +845,6 @@ const Admin = {
         <button class="btn btn-secondary" id="adminRefreshBtn">
           <i class="fa-solid fa-sync"></i> Refresh
         </button>
-        <button class="btn btn-secondary" id="adminExportBtn">
-          <i class="fa-solid fa-download"></i> Export CSV
-        </button>
       </div>
       <div class="admin-table-wrap">
         <table class="admin-table">
@@ -893,7 +885,6 @@ const Admin = {
 
     document.getElementById('adminAddProductBtn')?.addEventListener('click', () => this.showProductForm());
     document.getElementById('adminRefreshBtn')?.addEventListener('click', () => this.loadAdminData());
-    document.getElementById('adminExportBtn')?.addEventListener('click', ExportOrders.exportToCSV);
     
     container.querySelectorAll('.admin-edit-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1011,75 +1002,324 @@ const Admin = {
   }
 };
 
-/* ---------- EXPORT ORDERS ---------- */
-const ExportOrders = {
-  async exportToCSV() {
+/* ---------- ADMIN PESANAN ---------- */
+const AdminOrders = {
+  orders: [],
+  currentStatus: 'all',
+  
+  open() {
+    if (!this.checkAdminAccess()) return;
+    
+    document.getElementById('adminOrdersDrawer')?.classList.add('is-open');
+    document.getElementById('adminOrdersOverlay')?.classList.add('is-open');
+    this.load();
+  },
+  
+  close() {
+    document.getElementById('adminOrdersDrawer')?.classList.remove('is-open');
+    document.getElementById('adminOrdersOverlay')?.classList.remove('is-open');
+  },
+  
+  checkAdminAccess() {
+    const password = localStorage.getItem('admin_password');
+    if (password === CONFIG.ADMIN_PASSWORD) return true;
+    
+    const input = prompt('Masukkan password admin:');
+    if (input === CONFIG.ADMIN_PASSWORD) {
+      localStorage.setItem('admin_password', CONFIG.ADMIN_PASSWORD);
+      return true;
+    }
+    Utils.showToast('Password salah!', 'error');
+    return false;
+  },
+  
+  async load() {
     Utils.showLoading(true);
     try {
-      const orders = await API.fetchAll('online_orders', { 
+      const orders = await API.fetchAll('online_orders', {
         order: 'created_at.desc',
-        limit: 1000 
+        limit: 100
       });
-
-      if (orders.length === 0) {
-        Utils.showToast('Tidak ada data untuk diekspor', 'warning');
-        return;
-      }
-
-      const headers = ['ID', 'Tanggal', 'Nama Pelanggan', 'No HP', 'Tipe', 'Total', 'Status', 'Items'];
-      const rows = orders.map(o => [
-        o.id,
-        new Date(o.created_at).toLocaleString('id-ID'),
-        o.customer_name,
-        o.customer_phone,
-        o.fulfillment_type === 'delivery' ? 'Diantar' : 'Ambil Sendiri',
-        o.total_amount,
-        o.status,
-        (o.items || []).map(i => `${i.name} (${i.qty})`).join('; ')
-      ]);
-
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `orders_${new Date().toISOString().slice(0,10)}.csv`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-
-      Utils.showToast('Data berhasil diekspor!', 'success');
+      
+      this.orders = orders || [];
+      this.render();
+      this.updateBadge();
+      
     } catch (err) {
-      Utils.showToast('Gagal ekspor data: ' + err.message, 'error');
+      console.error('Gagal load pesanan:', err);
+      Utils.showToast('Gagal memuat pesanan', 'error');
     } finally {
       Utils.showLoading(false);
+    }
+  },
+  
+  render() {
+    const container = document.getElementById('adminOrdersContent');
+    if (!container) return;
+    
+    const stats = {
+      total: this.orders.length,
+      menunggu: this.orders.filter(o => o.status === 'menunggu_konfirmasi').length,
+      diproses: this.orders.filter(o => o.status === 'diproses').length,
+      selesai: this.orders.filter(o => o.status === 'selesai').length,
+    };
+    
+    let filtered = this.orders;
+    if (this.currentStatus !== 'all') {
+      filtered = filtered.filter(o => o.status === this.currentStatus);
+    }
+    
+    container.innerHTML = `
+      <div class="admin-stats">
+        <div class="stat-card">
+          <span class="stat-label">Total Pesanan</span>
+          <span class="stat-number">${stats.total}</span>
+        </div>
+        <div class="stat-card stat-warning">
+          <span class="stat-label">⏳ Menunggu</span>
+          <span class="stat-number">${stats.menunggu}</span>
+        </div>
+        <div class="stat-card stat-primary">
+          <span class="stat-label">📦 Diproses</span>
+          <span class="stat-number">${stats.diproses}</span>
+        </div>
+        <div class="stat-card stat-success">
+          <span class="stat-label">✅ Selesai</span>
+          <span class="stat-number">${stats.selesai}</span>
+        </div>
+      </div>
+      
+      <div class="admin-order-filters">
+        <button class="filter-btn ${this.currentStatus === 'all' ? 'active' : ''}" data-status="all">
+          Semua (${stats.total})
+        </button>
+        <button class="filter-btn ${this.currentStatus === 'menunggu_konfirmasi' ? 'active' : ''}" data-status="menunggu_konfirmasi">
+          ⏳ Menunggu (${stats.menunggu})
+        </button>
+        <button class="filter-btn ${this.currentStatus === 'dibayar' ? 'active' : ''}" data-status="dibayar">
+          💳 Dibayar
+        </button>
+        <button class="filter-btn ${this.currentStatus === 'diproses' ? 'active' : ''}" data-status="diproses">
+          📦 Diproses
+        </button>
+        <button class="filter-btn ${this.currentStatus === 'siap' ? 'active' : ''}" data-status="siap">
+          ✅ Siap
+        </button>
+        <button class="filter-btn ${this.currentStatus === 'selesai' ? 'active' : ''}" data-status="selesai">
+          🏁 Selesai
+        </button>
+        <button class="filter-btn ${this.currentStatus === 'dibatalkan' ? 'active' : ''}" data-status="dibatalkan">
+          ❌ Dibatalkan
+        </button>
+      </div>
+      
+      <div class="admin-order-list">
+        ${filtered.length === 0 ? `
+          <div class="empty-state">
+            <i class="fa-solid fa-inbox"></i>
+            <p>Tidak ada pesanan</p>
+          </div>
+        ` : filtered.map(order => this._orderCardHtml(order)).join('')}
+      </div>
+    `;
+    
+    container.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.currentStatus = btn.dataset.status;
+        this.render();
+      });
+    });
+    
+    container.querySelectorAll('.order-action-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt(btn.dataset.id);
+        const action = btn.dataset.action;
+        await this.updateStatus(id, action);
+      });
+    });
+    
+    container.querySelectorAll('.view-proof-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const url = btn.dataset.url;
+        if (url) window.open(url, '_blank');
+      });
+    });
+  },
+  
+  _orderCardHtml(order) {
+    const statusLabel = {
+      menunggu_konfirmasi: '⏳ Menunggu Konfirmasi',
+      dibayar: '💳 Dibayar',
+      diproses: '📦 Diproses',
+      siap: '✅ Siap',
+      selesai: '🏁 Selesai',
+      dibatalkan: '❌ Dibatalkan'
+    };
+    
+    const statusClass = {
+      menunggu_konfirmasi: 'status-warning',
+      dibayar: 'status-info',
+      diproses: 'status-primary',
+      siap: 'status-success',
+      selesai: 'status-success',
+      dibatalkan: 'status-danger'
+    };
+    
+    const actions = [];
+    if (order.status === 'menunggu_konfirmasi') {
+      actions.push({ label: '✅ Konfirmasi Bayar', action: 'dibayar', class: 'btn-success' });
+      actions.push({ label: '❌ Tolak', action: 'dibatalkan', class: 'btn-danger' });
+    }
+    if (order.status === 'dibayar') {
+      actions.push({ label: '📦 Proses', action: 'diproses', class: 'btn-primary' });
+    }
+    if (order.status === 'diproses') {
+      actions.push({ label: '✅ Siap', action: 'siap', class: 'btn-success' });
+    }
+    if (order.status === 'siap') {
+      actions.push({ label: '🏁 Selesai', action: 'selesai', class: 'btn-secondary' });
+    }
+    
+    return `
+      <div class="admin-order-card">
+        <div class="admin-order-header">
+          <div>
+            <span class="order-id">#${order.id}</span>
+            <span class="order-date">${new Date(order.created_at).toLocaleString('id-ID')}</span>
+          </div>
+          <span class="order-status-badge ${statusClass[order.status]}">${statusLabel[order.status]}</span>
+        </div>
+        
+        <div class="admin-order-body">
+          <div class="order-customer-info">
+            <strong>${Utils.escapeHtml(order.customer_name)}</strong>
+            <span>📱 ${Utils.escapeHtml(order.customer_phone)}</span>
+          </div>
+          
+          <div class="order-delivery-info">
+            <span>${order.fulfillment_type === 'delivery' ? '🛵 Diantar' : '🏪 Ambil Sendiri'}</span>
+            ${order.address ? `<span class="address">📍 ${Utils.escapeHtml(order.address)}</span>` : ''}
+          </div>
+          
+          <div class="order-items-list">
+            ${(order.items || []).map(item => `
+              <div class="order-item-row">
+                <span>${Utils.escapeHtml(item.name)}</span>
+                <span>${item.qty} × ${Utils.formatCurrency(item.price)}</span>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="order-total-amount">
+            <strong>Total: ${Utils.formatCurrency(order.total_amount)}</strong>
+          </div>
+          
+          ${order.payment_proof_url ? `
+            <button class="btn btn-sm btn-info view-proof-btn" data-url="${order.payment_proof_url}">
+              <i class="fa-solid fa-image"></i> Lihat Bukti Transfer
+            </button>
+          ` : '<span class="no-proof">Tidak ada bukti transfer</span>'}
+          
+          ${order.notes ? `<div class="order-note">📝 ${Utils.escapeHtml(order.notes)}</div>` : ''}
+        </div>
+        
+        <div class="admin-order-footer">
+          ${actions.map(action => `
+            <button class="btn btn-sm ${action.class} order-action-btn" data-id="${order.id}" data-action="${action.action}">
+              ${action.label}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  },
+  
+  async updateStatus(orderId, newStatus) {
+    if (!confirm(`Ubah status pesanan #${orderId} menjadi "${newStatus}"?`)) return;
+    
+    Utils.showLoading(true);
+    try {
+      await API.update('online_orders', 
+        { id: `eq.${orderId}` }, 
+        { 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        }
+      );
+      
+      if (newStatus === 'diproses') {
+        await this.updateStock(orderId);
+      }
+      
+      Utils.showToast(`Status pesanan #${orderId} berhasil diubah`, 'success');
+      await this.load();
+      
+    } catch (err) {
+      console.error('Gagal update status:', err);
+      Utils.showToast('Gagal mengubah status', 'error');
+    } finally {
+      Utils.showLoading(false);
+    }
+  },
+  
+  async updateStock(orderId) {
+    const order = this.orders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    try {
+      for (const item of (order.items || [])) {
+        const product = STATE.products.find(p => String(p.id) === String(item.productId));
+        if (product) {
+          const newStock = product.stock - item.qty;
+          await API.update('products', 
+            { id: `eq.${item.productId}` }, 
+            { stock: Math.max(0, newStock) }
+          );
+        }
+      }
+      await Catalog.load();
+      Utils.showToast('Stok produk berhasil diupdate', 'success');
+    } catch (err) {
+      console.error('Gagal update stok:', err);
+    }
+  },
+  
+  updateBadge() {
+    const count = this.orders.filter(o => o.status === 'menunggu_konfirmasi').length;
+    const badge = document.getElementById('adminOrdersBadge');
+    if (badge) {
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'inline' : 'none';
     }
   }
 };
 
 /* ---------- INIT EVENTS ---------- */
 function initEvents() {
-  // Cart events
+  // Cart
   document.getElementById('cartBtn')?.addEventListener('click', () => Cart.open());
   document.getElementById('closeCartBtn')?.addEventListener('click', () => Cart.close());
   document.getElementById('cartOverlay')?.addEventListener('click', () => Cart.close());
   document.getElementById('checkoutBtn')?.addEventListener('click', () => Checkout.open());
 
-  // Checkout events
+  // Checkout
   document.getElementById('closeCheckoutBtn')?.addEventListener('click', () => Checkout.close());
   document.getElementById('checkoutOverlay')?.addEventListener('click', () => Checkout.close());
 
-  // Orders events
+  // Orders
   document.getElementById('ordersBtn')?.addEventListener('click', () => Orders.open());
   document.getElementById('closeOrdersBtn')?.addEventListener('click', () => Orders.close());
   document.getElementById('ordersOverlay')?.addEventListener('click', () => Orders.close());
 
-  // Admin events
+  // Admin Produk
   document.getElementById('adminToggleBtn')?.addEventListener('click', () => Admin.toggleAdminMode());
   document.getElementById('closeAdminBtn')?.addEventListener('click', () => Admin.close());
   document.getElementById('adminOverlay')?.addEventListener('click', () => Admin.close());
+
+  // Admin Pesanan
+  document.getElementById('adminOrdersBtn')?.addEventListener('click', () => AdminOrders.open());
+  document.getElementById('closeAdminOrdersBtn')?.addEventListener('click', () => AdminOrders.close());
+  document.getElementById('adminOrdersOverlay')?.addEventListener('click', () => AdminOrders.close());
 
   // Search
   document.getElementById('searchInput')?.addEventListener('input', Utils.debounce((e) => {
@@ -1090,14 +1330,42 @@ function initEvents() {
 
 function checkSupabaseConfigured() {
   if (API.isConfigured()) return true;
-  const key = prompt('Masukkan Supabase Anon Key (sama dengan yang dipakai aplikasi kasir):');
+  const key = prompt('Masukkan Supabase Anon Key:');
   if (key) {
     localStorage.setItem(CONFIG.STORAGE_KEYS.SUPABASE_KEY, key.trim());
     CONFIG.SUPABASE_ANON_KEY = key.trim();
     return true;
   }
-  Utils.showToast('Aplikasi butuh Supabase Anon Key untuk berjalan', 'error', 6000);
+  Utils.showToast('Aplikasi butuh Supabase Anon Key', 'error', 6000);
   return false;
+}
+
+/* ---------- AUTO REFRESH & NOTIFICATION ---------- */
+let lastOrderCount = 0;
+
+async function checkNewOrders() {
+  try {
+    const orders = await API.fetchAll('online_orders', {
+      status: 'eq.menunggu_konfirmasi',
+      limit: 100
+    });
+    
+    const count = orders.length;
+    if (count > lastOrderCount && lastOrderCount > 0) {
+      Utils.showToast(`🔔 Ada ${count - lastOrderCount} pesanan baru!`, 'success', 5000);
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRlQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoAAACBhYqFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYaFhYWFhQ==');
+        audio.play();
+      } catch(e) {}
+    }
+    lastOrderCount = count;
+    
+    const badge = document.getElementById('adminOrdersBadge');
+    if (badge) {
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'inline' : 'none';
+    }
+  } catch(e) {}
 }
 
 /* ---------- INIT ---------- */
@@ -1116,8 +1384,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     OrderStatus.startWatching();
   }
   
+  // Cek pesanan baru setiap 30 detik
+  setInterval(checkNewOrders, 30000);
+  checkNewOrders();
+  
   console.log('🛍️ MBUN COLLECTION Online Store loaded!');
 });
 
 // Export untuk debugging
-window.__MBUN = { STATE, API, Catalog, Cart, Checkout, Orders, Admin, Promo, OrderStatus, ExportOrders, Security, LazyLoader };
+window.__MBUN = { STATE, API, Catalog, Cart, Checkout, Orders, Admin, AdminOrders, Promo, OrderStatus, Security, LazyLoader };
