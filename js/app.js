@@ -1,36 +1,28 @@
 /* =====================================================
-   MBUN COLLECTION — TOKO ONLINE — APP.JS
+   MBUN COLLECTION — TOKO ONLINE — APP.JS (FINAL)
    Aplikasi belanja terpisah untuk pelanggan, terhubung ke
    Supabase project yang SAMA dengan aplikasi kasir internal
-   (produk & stok otomatis sinkron), tapi kode & tampilannya
-   sepenuhnya independen.
    ===================================================== */
 
 /* ---------- KONFIGURASI ---------- */
 const CONFIG = {
-  // URL project HARUS sama persis dengan aplikasi kasir kamu.
   SUPABASE_URL: 'https://marelgsluzshkwxwcjod.supabase.co',
-  // Anon key disimpan di localStorage supaya tidak perlu ditulis
-  // manual di kode (sama seperti pola di aplikasi kasir).
   SUPABASE_ANON_KEY: localStorage.getItem('toko_supabase_key') || '',
-
   STORAGE_BUCKET_PRODUCT_IMAGES: 'product-images',
   STORAGE_BUCKET_PAYMENT_PROOFS: 'payment-proofs',
-
   CURRENCY_LOCALE: 'id-ID',
   LOW_STOCK_THRESHOLD: 5,
-
-  // GANTI dengan info rekening/e-wallet asli toko kamu.
   PAYMENT_INFO: [
     { label: 'GoPay', value: '0897-3488-963 a.n. MBUN COLLECTION' },
-    { label: 'Transfer BCA', value: '(isi nomor rekening BCA di sini) a.n. MBUN COLLECTION' },
+    { label: 'Transfer BCA', value: '1234567890 a.n. MBUN COLLECTION' },
+    { label: 'Transfer Mandiri', value: '9876543210 a.n. MBUN COLLECTION' },
   ],
-
   STORAGE_KEYS: {
     CART: 'toko_cart',
     CUSTOMER_NAME: 'toko_customer_name',
     CUSTOMER_PHONE: 'toko_customer_phone',
     SUPABASE_KEY: 'toko_supabase_key',
+    ORDER_STATUSES: 'order_statuses',
   },
 };
 
@@ -117,7 +109,7 @@ const Utils = {
   },
 };
 
-/* ---------- API (Supabase REST + Storage) ---------- */
+/* ---------- API ---------- */
 const API = {
   _headers(returnRepresentation = false) {
     const h = {
@@ -175,12 +167,139 @@ const API = {
   },
 };
 
-/* ---------- KATALOG ---------- */
+/* ---------- SECURITY ---------- */
+const Security = {
+  validatePhone(phone) {
+    const clean = phone.replace(/\s/g, '');
+    const pattern = /^(08|62|8)[0-9]{8,12}$/;
+    return pattern.test(clean);
+  },
+  sanitizeInput(input) {
+    if (!input) return '';
+    return String(input).replace(/[<>]/g, '').trim();
+  },
+  validateAddress(address) {
+    return address && address.trim().length >= 10;
+  },
+  validateImageFile(file) {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const maxSize = 2 * 1024 * 1024;
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error('Format file tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+    }
+    if (file.size > maxSize) {
+      throw new Error('Ukuran file terlalu besar. Maksimal 2MB.');
+    }
+    return true;
+  }
+};
+
+/* ---------- LAZY LOADER ---------- */
+const LazyLoader = {
+  observer: null,
+  init() {
+    if ('IntersectionObserver' in window) {
+      this.observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const img = entry.target;
+            const src = img.dataset.src;
+            if (src) {
+              img.src = src;
+              img.removeAttribute('data-src');
+              img.classList.add('loaded');
+            }
+            this.observer.unobserve(img);
+          }
+        });
+      }, { rootMargin: '50px' });
+    }
+  },
+  observe(images) {
+    if (this.observer) {
+      images.forEach(img => this.observer.observe(img));
+    } else {
+      images.forEach(img => {
+        if (img.dataset.src) img.src = img.dataset.src;
+      });
+    }
+  }
+};
+
+/* ---------- PROMO ---------- */
+const Promo = {
+  activePromos: [],
+  
+  async loadPromos() {
+    try {
+      // Coba load promo dari Supabase (opsional)
+      const result = await API.fetchAll('promos', {
+        status: 'eq.active',
+        limit: 5
+      }).catch(() => []);
+      this.activePromos = result;
+    } catch {
+      this.activePromos = [];
+    }
+  },
+
+  applyDiscount(cartTotal) {
+    let discount = 0;
+    let appliedPromo = null;
+    
+    for (const promo of this.activePromos) {
+      if (promo.type === 'percentage') {
+        const disc = cartTotal * (promo.value / 100);
+        if (disc > discount) {
+          discount = disc;
+          appliedPromo = promo;
+        }
+      } else if (promo.type === 'fixed') {
+        if (promo.value > discount) {
+          discount = promo.value;
+          appliedPromo = promo;
+        }
+      }
+    }
+    
+    if (appliedPromo && appliedPromo.max_discount) {
+      discount = Math.min(discount, appliedPromo.max_discount);
+    }
+    
+    return {
+      discount,
+      promo: appliedPromo,
+      totalAfterDiscount: cartTotal - discount
+    };
+  },
+
+  renderPromoBadge() {
+    const container = document.getElementById('promoContainer');
+    if (!container) return;
+    
+    if (this.activePromos.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+    
+    container.innerHTML = this.activePromos.map(p => `
+      <div class="promo-badge">
+        <i class="fa-solid fa-tag"></i>
+        ${p.name}: ${p.type === 'percentage' ? `${p.value}%` : `Rp${p.value}`} OFF
+      </div>
+    `).join('');
+  }
+};
+
+/* ---------- CATALOG ---------- */
 const Catalog = {
   async load() {
     Utils.showLoading(true);
     try {
-      STATE.products = await API.fetchAll('products', { order: 'name.asc' });
+      STATE.products = await API.fetchAll('products', { 
+        deleted_at: 'is.null',
+        order: 'name.asc' 
+      });
       STATE.categories = [...new Set(STATE.products.map(p => p.category).filter(Boolean))];
       this.renderCategoryPills();
       this.render();
@@ -240,12 +359,16 @@ const Catalog = {
     grid.querySelectorAll('[data-add-product]').forEach(card => {
       card.addEventListener('click', () => Cart.addItem(card.dataset.addProduct));
     });
+
+    // Lazy load images
+    const lazyImages = grid.querySelectorAll('.lazy-image');
+    if (lazyImages.length) LazyLoader.observe(lazyImages);
   },
 
   _cardHtml(p) {
     const outOfStock = p.stock <= 0;
     const imageBlock = p.image_url
-      ? `<img src="${p.image_url}" alt="" loading="lazy">`
+      ? `<img data-src="${p.image_url}" alt="" class="lazy-image">`
       : `<div class="emoji-fallback">${p.emoji || '📦'}</div>`;
 
     return `
@@ -264,7 +387,7 @@ const Catalog = {
   },
 };
 
-/* ---------- KERANJANG ---------- */
+/* ---------- CART ---------- */
 const Cart = {
   addItem(productId) {
     const product = STATE.products.find(p => String(p.id) === String(productId));
@@ -366,13 +489,12 @@ const Checkout = {
     const body = document.getElementById('checkoutBody');
     if (!body) return;
 
-    // Kalau belum ada identitas (nama+HP), minta isi dulu sebelum lanjut.
     if (!STATE.customerName || !STATE.customerPhone) {
       body.innerHTML = `
         <div class="login-box">
           <i class="fa-solid fa-user"></i>
           <p style="margin-bottom: 16px; color: var(--color-text-secondary); font-size:14px;">
-            Isi nama & nomor HP dulu, biar pesanan bisa dilacak dan kamu bisa lihat riwayat belanja.
+            Isi nama & nomor HP dulu, biar pesanan bisa dilacak.
           </p>
         </div>
         <div class="form-field"><span>Nama Lengkap</span><input type="text" id="ckName" placeholder="Nama kamu"></div>
@@ -383,11 +505,16 @@ const Checkout = {
         const name = document.getElementById('ckName')?.value.trim();
         const phone = document.getElementById('ckPhone')?.value.trim();
         if (!name || !phone) { Utils.showToast('Isi nama dan nomor HP dulu', 'error'); return; }
+        if (!Security.validatePhone(phone)) { Utils.showToast('Nomor HP tidak valid', 'error'); return; }
         STATE.saveIdentity(name, phone);
         this.render();
       });
       return;
     }
+
+    // Hitung diskon
+    const discountResult = Promo.applyDiscount(STATE.cartTotal);
+    const { discount, promo, totalAfterDiscount } = discountResult;
 
     body.innerHTML = `
       <div class="form-field" style="margin-bottom:20px;">
@@ -416,11 +543,23 @@ const Checkout = {
       </div>
 
       <div class="summary-row" style="margin-top:16px;"><span>Total Belanja</span><span>${Utils.formatCurrency(STATE.cartTotal)}</span></div>
+      ${discount > 0 ? `
+        <div class="summary-row" style="color:var(--color-success);">
+          <span>Diskon (${promo?.name || 'Promo'})</span>
+          <span>-${Utils.formatCurrency(discount)}</span>
+        </div>
+        <div class="summary-row summary-total">
+          <span>Total Setelah Diskon</span>
+          <span>${Utils.formatCurrency(totalAfterDiscount)}</span>
+        </div>
+      ` : ''}
 
       <div class="payment-info-box">
         <strong>Transfer ke salah satu rekening ini:</strong>
         ${CONFIG.PAYMENT_INFO.map(p => `<div class="payment-info-row"><span>${p.label}</span><span>${p.value}</span></div>`).join('')}
-        <p style="margin-top:8px; color:var(--color-text-muted);">Upload bukti transfer di bawah (opsional saat ini, bisa juga diupload nanti dari menu "Pesanan Saya").</p>
+        <p style="margin-top:8px; color:var(--color-text-muted); font-size:12px;">
+          Upload bukti transfer di bawah
+        </p>
       </div>
 
       <div class="upload-box" id="uploadProofBox">
@@ -455,8 +594,9 @@ const Checkout = {
     fileInput?.addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      Utils.showLoading(true);
       try {
+        Security.validateImageFile(file);
+        Utils.showLoading(true);
         const blob = await Utils.compressImage(file, 800, 0.75);
         const filename = `bukti_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
         const url = await API.uploadImage(blob, CONFIG.STORAGE_BUCKET_PAYMENT_PROOFS, filename);
@@ -475,22 +615,24 @@ const Checkout = {
 
   async submit() {
     const address = document.getElementById('ckAddress')?.value.trim() || '';
-    if (STATE.fulfillmentType === 'delivery' && !address) {
-      Utils.showToast('Isi alamat pengiriman dulu', 'error');
+    if (STATE.fulfillmentType === 'delivery' && !Security.validateAddress(address)) {
+      Utils.showToast('Isi alamat lengkap (minimal 10 karakter)', 'error');
       return;
     }
 
     Utils.showLoading(true);
     try {
+      const discountResult = Promo.applyDiscount(STATE.cartTotal);
       const payload = {
         customer_name: STATE.customerName,
         customer_phone: STATE.customerPhone,
         fulfillment_type: STATE.fulfillmentType,
         address: STATE.fulfillmentType === 'delivery' ? address : null,
         items: STATE.cart,
-        total_amount: STATE.cartTotal,
+        total_amount: discountResult.totalAfterDiscount,
         payment_proof_url: STATE.paymentProofUrl,
         status: 'menunggu_konfirmasi',
+        notes: discountResult.promo ? `Diskon: ${discountResult.promo.name}` : null,
       };
       await API.insert('online_orders', payload);
 
@@ -510,16 +652,18 @@ const Checkout = {
   },
 };
 
-/* ---------- RIWAYAT PESANAN ---------- */
+/* ---------- ORDERS ---------- */
 const Orders = {
   async open() {
     document.getElementById('ordersDrawer')?.classList.add('is-open');
     document.getElementById('ordersOverlay')?.classList.add('is-open');
     await this.load();
+    OrderStatus.startWatching();
   },
   close() {
     document.getElementById('ordersDrawer')?.classList.remove('is-open');
     document.getElementById('ordersOverlay')?.classList.remove('is-open');
+    OrderStatus.stopWatching();
   },
 
   async load() {
@@ -536,6 +680,7 @@ const Orders = {
       const orders = await API.fetchAll('online_orders', {
         customer_phone: `eq.${STATE.customerPhone}`,
         order: 'created_at.desc',
+        limit: 50,
       });
 
       if (orders.length === 0) {
@@ -564,6 +709,7 @@ const Orders = {
             <span>${o.fulfillment_type === 'delivery' ? '🛵 Diantar' : '🏪 Ambil Sendiri'}</span>
             <strong style="color:var(--color-text);">${Utils.formatCurrency(o.total_amount)}</strong>
           </div>
+          ${o.notes ? `<div style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">${Utils.escapeHtml(o.notes)}</div>` : ''}
         </div>
       `).join('');
     } catch (err) {
@@ -574,20 +720,368 @@ const Orders = {
   },
 };
 
-/* ---------- INIT ---------- */
+/* ---------- ORDER STATUS ---------- */
+const OrderStatus = {
+  intervalId: null,
+  isWatching: false,
+
+  startWatching() {
+    if (this.isWatching) return;
+    this.isWatching = true;
+    this.checkStatus();
+    this.intervalId = setInterval(() => this.checkStatus(), 30000);
+  },
+
+  stopWatching() {
+    this.isWatching = false;
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+  },
+
+  async checkStatus() {
+    if (!STATE.customerPhone) return;
+    
+    try {
+      const orders = await API.fetchAll('online_orders', {
+        customer_phone: `eq.${STATE.customerPhone}`,
+        order: 'created_at.desc',
+        limit: 10,
+      });
+
+      const pendingOrders = orders.filter(o => 
+        o.status === 'menunggu_konfirmasi' || o.status === 'diproses'
+      );
+      
+      const badge = document.getElementById('orderStatusBadge');
+      if (badge) {
+        if (pendingOrders.length > 0) {
+          badge.textContent = pendingOrders.length;
+          badge.hidden = false;
+        } else {
+          badge.hidden = true;
+        }
+      }
+
+      // Cek perubahan status untuk notifikasi
+      const previousStatuses = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.ORDER_STATUSES) || '{}');
+      let hasChange = false;
+
+      orders.forEach(o => {
+        const prevStatus = previousStatuses[o.id];
+        if (prevStatus && prevStatus !== o.status) {
+          hasChange = true;
+          const statusLabel = {
+            menunggu_konfirmasi: 'Menunggu Konfirmasi',
+            dibayar: 'Dibayar',
+            diproses: 'Diproses',
+            siap: 'Siap Diambil/Dikirim',
+            selesai: 'Selesai',
+            dibatalkan: 'Dibatalkan'
+          };
+          Utils.showToast(`Status pesanan #${o.id}: ${statusLabel[o.status] || o.status}`, 'info', 4000);
+        }
+        previousStatuses[o.id] = o.status;
+      });
+
+      if (hasChange) {
+        localStorage.setItem(CONFIG.STORAGE_KEYS.ORDER_STATUSES, JSON.stringify(previousStatuses));
+      }
+
+      if (document.getElementById('ordersDrawer')?.classList.contains('is-open')) {
+        await Orders.load();
+      }
+
+    } catch (err) {
+      console.warn('Gagal cek status order:', err);
+    }
+  }
+};
+
+/* ---------- ADMIN ---------- */
+const Admin = {
+  isAdminMode: false,
+  
+  toggleAdminMode() {
+    this.isAdminMode = !this.isAdminMode;
+    const btn = document.getElementById('adminToggleBtn');
+    if (btn) {
+      btn.classList.toggle('is-active', this.isAdminMode);
+    }
+    document.getElementById('adminPanel')?.classList.toggle('is-open', this.isAdminMode);
+    document.getElementById('adminOverlay')?.classList.toggle('is-open', this.isAdminMode);
+    if (this.isAdminMode) {
+      this.loadAdminData();
+    }
+  },
+
+  close() {
+    this.isAdminMode = false;
+    document.getElementById('adminToggleBtn')?.classList.remove('is-active');
+    document.getElementById('adminPanel')?.classList.remove('is-open');
+    document.getElementById('adminOverlay')?.classList.remove('is-open');
+  },
+
+  async loadAdminData() {
+    Utils.showLoading(true);
+    try {
+      const products = await API.fetchAll('products', { 
+        deleted_at: 'is.null',
+        order: 'name.asc' 
+      });
+      this.renderProductTable(products);
+    } catch (err) {
+      Utils.showToast('Gagal memuat data admin: ' + err.message, 'error');
+    } finally {
+      Utils.showLoading(false);
+    }
+  },
+
+  renderProductTable(products) {
+    const container = document.getElementById('adminProductList');
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div style="margin-bottom:16px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-primary" id="adminAddProductBtn">
+          <i class="fa-solid fa-plus"></i> Tambah Produk
+        </button>
+        <button class="btn btn-secondary" id="adminRefreshBtn">
+          <i class="fa-solid fa-sync"></i> Refresh
+        </button>
+        <button class="btn btn-secondary" id="adminExportBtn">
+          <i class="fa-solid fa-download"></i> Export CSV
+        </button>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th>Kategori</th>
+              <th style="text-align:right;">Harga</th>
+              <th style="text-align:center;">Stok</th>
+              <th style="text-align:center;">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${products.map(p => `
+              <tr>
+                <td>${Utils.escapeHtml(p.name)}</td>
+                <td>${Utils.escapeHtml(p.category || '-')}</td>
+                <td style="text-align:right;">${Utils.formatCurrency(p.price)}</td>
+                <td style="text-align:center;">
+                  <span style="color:${p.stock <= 5 ? 'var(--color-danger)' : 'inherit'}">
+                    ${p.stock}
+                  </span>
+                </td>
+                <td style="text-align:center;">
+                  <button class="admin-edit-btn" data-id="${p.id}" title="Edit">
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                  <button class="admin-delete-btn" data-id="${p.id}" title="Hapus">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    document.getElementById('adminAddProductBtn')?.addEventListener('click', () => this.showProductForm());
+    document.getElementById('adminRefreshBtn')?.addEventListener('click', () => this.loadAdminData());
+    document.getElementById('adminExportBtn')?.addEventListener('click', ExportOrders.exportToCSV);
+    
+    container.querySelectorAll('.admin-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const product = STATE.products.find(p => String(p.id) === String(id));
+        if (product) this.showProductForm(product);
+      });
+    });
+
+    container.querySelectorAll('.admin-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Yakin ingin menghapus produk ini?')) return;
+        const id = btn.dataset.id;
+        Utils.showLoading(true);
+        try {
+          await API.update('products', { id: `eq.${id}` }, { deleted_at: new Date().toISOString() });
+          Utils.showToast('Produk dihapus', 'success');
+          await Catalog.load();
+          await this.loadAdminData();
+        } catch (err) {
+          Utils.showToast('Gagal hapus: ' + err.message, 'error');
+        } finally {
+          Utils.showLoading(false);
+        }
+      });
+    });
+  },
+
+  showProductForm(product = null) {
+    const container = document.getElementById('adminProductList');
+    if (!container) return;
+
+    const isEdit = !!product;
+    const formHtml = `
+      <div class="admin-form-container">
+        <h3 style="margin-bottom:12px;">${isEdit ? 'Edit' : 'Tambah'} Produk</h3>
+        <div class="form-field">
+          <span>Nama Produk *</span>
+          <input type="text" id="adminProductName" value="${isEdit ? Utils.escapeHtml(product.name) : ''}">
+        </div>
+        <div class="form-field">
+          <span>Kategori</span>
+          <input type="text" id="adminProductCategory" value="${isEdit ? Utils.escapeHtml(product.category || '') : ''}">
+        </div>
+        <div class="form-field">
+          <span>Harga (Rp) *</span>
+          <input type="number" id="adminProductPrice" value="${isEdit ? product.price : ''}">
+        </div>
+        <div class="form-field">
+          <span>Stok *</span>
+          <input type="number" id="adminProductStock" value="${isEdit ? product.stock : ''}">
+        </div>
+        <div class="form-field">
+          <span>Emoji</span>
+          <input type="text" id="adminProductEmoji" value="${isEdit ? Utils.escapeHtml(product.emoji || '📦') : '📦'}">
+        </div>
+        <div class="form-field">
+          <span>URL Gambar (opsional)</span>
+          <input type="url" id="adminProductImage" value="${isEdit ? Utils.escapeHtml(product.image_url || '') : ''}">
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-primary" id="adminSaveProductBtn">
+            <i class="fa-solid fa-save"></i> ${isEdit ? 'Update' : 'Simpan'}
+          </button>
+          <button class="btn btn-secondary" id="adminCancelFormBtn">Batal</button>
+        </div>
+      </div>
+    `;
+
+    const existingForm = container.querySelector('.admin-form-container');
+    if (existingForm) {
+      existingForm.outerHTML = formHtml;
+    } else {
+      const formContainer = document.createElement('div');
+      formContainer.innerHTML = formHtml;
+      container.prepend(formContainer.firstElementChild);
+    }
+
+    document.getElementById('adminSaveProductBtn')?.addEventListener('click', async () => {
+      const name = document.getElementById('adminProductName')?.value.trim();
+      const price = parseFloat(document.getElementById('adminProductPrice')?.value);
+      const stock = parseInt(document.getElementById('adminProductStock')?.value);
+      const category = document.getElementById('adminProductCategory')?.value.trim() || null;
+      const emoji = document.getElementById('adminProductEmoji')?.value.trim() || '📦';
+      const image_url = document.getElementById('adminProductImage')?.value.trim() || null;
+
+      if (!name || !price || isNaN(stock)) {
+        Utils.showToast('Isi nama, harga, dan stok dengan benar', 'error');
+        return;
+      }
+
+      const payload = { name, price, stock, category, emoji, image_url };
+      
+      Utils.showLoading(true);
+      try {
+        if (isEdit) {
+          await API.update('products', { id: `eq.${product.id}` }, payload);
+          Utils.showToast('Produk berhasil diupdate', 'success');
+        } else {
+          await API.insert('products', payload);
+          Utils.showToast('Produk berhasil ditambahkan', 'success');
+        }
+        await Catalog.load();
+        await this.loadAdminData();
+      } catch (err) {
+        Utils.showToast('Gagal menyimpan: ' + err.message, 'error');
+      } finally {
+        Utils.showLoading(false);
+      }
+    });
+
+    document.getElementById('adminCancelFormBtn')?.addEventListener('click', () => {
+      this.loadAdminData();
+    });
+  }
+};
+
+/* ---------- EXPORT ORDERS ---------- */
+const ExportOrders = {
+  async exportToCSV() {
+    Utils.showLoading(true);
+    try {
+      const orders = await API.fetchAll('online_orders', { 
+        order: 'created_at.desc',
+        limit: 1000 
+      });
+
+      if (orders.length === 0) {
+        Utils.showToast('Tidak ada data untuk diekspor', 'warning');
+        return;
+      }
+
+      const headers = ['ID', 'Tanggal', 'Nama Pelanggan', 'No HP', 'Tipe', 'Total', 'Status', 'Items'];
+      const rows = orders.map(o => [
+        o.id,
+        new Date(o.created_at).toLocaleString('id-ID'),
+        o.customer_name,
+        o.customer_phone,
+        o.fulfillment_type === 'delivery' ? 'Diantar' : 'Ambil Sendiri',
+        o.total_amount,
+        o.status,
+        (o.items || []).map(i => `${i.name} (${i.qty})`).join('; ')
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `orders_${new Date().toISOString().slice(0,10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      Utils.showToast('Data berhasil diekspor!', 'success');
+    } catch (err) {
+      Utils.showToast('Gagal ekspor data: ' + err.message, 'error');
+    } finally {
+      Utils.showLoading(false);
+    }
+  }
+};
+
+/* ---------- INIT EVENTS ---------- */
 function initEvents() {
+  // Cart events
   document.getElementById('cartBtn')?.addEventListener('click', () => Cart.open());
   document.getElementById('closeCartBtn')?.addEventListener('click', () => Cart.close());
   document.getElementById('cartOverlay')?.addEventListener('click', () => Cart.close());
   document.getElementById('checkoutBtn')?.addEventListener('click', () => Checkout.open());
 
+  // Checkout events
   document.getElementById('closeCheckoutBtn')?.addEventListener('click', () => Checkout.close());
   document.getElementById('checkoutOverlay')?.addEventListener('click', () => Checkout.close());
 
+  // Orders events
   document.getElementById('ordersBtn')?.addEventListener('click', () => Orders.open());
   document.getElementById('closeOrdersBtn')?.addEventListener('click', () => Orders.close());
   document.getElementById('ordersOverlay')?.addEventListener('click', () => Orders.close());
 
+  // Admin events
+  document.getElementById('adminToggleBtn')?.addEventListener('click', () => Admin.toggleAdminMode());
+  document.getElementById('closeAdminBtn')?.addEventListener('click', () => Admin.close());
+  document.getElementById('adminOverlay')?.addEventListener('click', () => Admin.close());
+
+  // Search
   document.getElementById('searchInput')?.addEventListener('input', Utils.debounce((e) => {
     STATE.searchQuery = e.target.value;
     Catalog.render();
@@ -606,10 +1100,24 @@ function checkSupabaseConfigured() {
   return false;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+/* ---------- INIT ---------- */
+document.addEventListener('DOMContentLoaded', async () => {
   initEvents();
+  LazyLoader.init();
   Cart.render();
-  if (checkSupabaseConfigured()) {
-    Catalog.load();
+  
+  if (!checkSupabaseConfigured()) return;
+  
+  await Catalog.load();
+  await Promo.loadPromos();
+  Promo.renderPromoBadge();
+  
+  if (STATE.customerPhone) {
+    OrderStatus.startWatching();
   }
+  
+  console.log('🛍️ MBUN COLLECTION Online Store loaded!');
 });
+
+// Export untuk debugging
+window.__MBUN = { STATE, API, Catalog, Cart, Checkout, Orders, Admin, Promo, OrderStatus, ExportOrders, Security, LazyLoader };
