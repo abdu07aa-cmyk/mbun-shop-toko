@@ -1,205 +1,98 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>Timbangan Kertas - Professional</title>
-  <link rel="stylesheet" href="style.css">
-  <style>
-    /* Fallback jika CSS external tidak terload */
-    body { background: #e0e7ff; font-family: Arial, sans-serif; margin: 0; padding: 12px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="description" content="MBUN COLLECTION — Belanja online, ambil sendiri atau diantar">
+<title>MBUN COLLECTION — Toko Online</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-<div class="container">
-  <div class="tab-bar">
-    <div class="tab active" data-page="page1">📦 Timbang</div>
-    <div class="tab" data-page="page2">📜 Riwayat (Cloud)</div>
+
+  <!-- ============== HEADER ============== -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="topbar-logo">🛍️</span>
+      <div>
+        <h1>MBUN COLLECTION</h1>
+        <span>Belanja Hemat, Hidup Nikmat</span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="ordersBtn" aria-label="Pesanan Saya" title="Pesanan Saya">
+        <i class="fa-solid fa-receipt"></i>
+      </button>
+      <button class="icon-btn" id="cartBtn" aria-label="Keranjang" title="Keranjang">
+        <i class="fa-solid fa-cart-shopping"></i>
+        <span id="cartBadge" class="badge" hidden>0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============== SEARCH & CATEGORY ============== -->
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="fa-solid fa-search"></i>
+      <input type="text" id="searchInput" placeholder="Cari produk...">
+    </div>
+    <div class="category-pills" id="categoryPills"></div>
   </div>
 
-  <!-- HALAMAN 1: TIMBANG -->
-  <div id="page1" class="page active-page">
-    <div class="card">
-      <h1>📦 TIMBANG 1 BOX KERTAS</h1>
-      <div class="note">✅ Bundles dibulatkan KE ATAS | PO & Brand TETAP setelah simpan</div>
-
-      <label for="tanggal">📅 Tanggal</label>
-      <input type="date" id="tanggal">
-
-      <label for="noPo">📄 No. PO</label>
-      <input type="text" id="noPo" placeholder="PO-001">
-
-      <label for="brand">🏷️ Brand</label>
-      <input type="text" id="brand" placeholder="Contoh: RONSON, ROYO">
-
-      <label for="size">📏 Size Kertas</label>
-      <select id="size">
-        <option value="SINGLE 36X69">SINGLE 36X69</option>
-        <option value="1 1/4 44X78">1 1/4 44X78</option>
-        <option value="CLEAR PAPER 1 1/4 44X78">CLEAR PAPER 1 1/4 44X78</option>
-        <option value="KS 54X97">KS 54X97</option>
-        <option value="KSS 44X108">KSS 44X108</option>
-        <option value="KSS SLIM 36X108">KSS SLIM 36X108</option>
-        <option value="SKS 54X108">SKS 54X108</option>
-        <option value="CLEAR PAPER SKS 54X108">CLEAR PAPER SKS 54X108</option>
-      </select>
-
-      <div class="row-2">
-        <div>
-          <label for="gsm">📄 GSM</label>
-          <select id="gsm">
-            <option value="13">13</option><option value="14">14</option>
-            <option value="20">20</option><option value="35">35</option>
-          </select>
-        </div>
-        <div>
-          <label for="leaves">📑 Leaves/Bundle</label>
-          <select id="leaves">
-            <option value="32">32</option><option value="33">33</option><option value="34">34</option>
-            <option value="35">35</option><option value="40">40</option><option value="42">42</option>
-            <option value="50">50</option><option value="51">51</option><option value="52">52</option>
-            <option value="60">60</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="row-2">
-        <div>
-          <label for="box">📦 Jenis Box</label>
-          <select id="box">
-            <option value="White">White (0.90 kg)</option>
-            <option value="White New">White New (0.80 kg)</option>
-            <option value="Grey">Grey (1.25 kg)</option>
-            <option value="Green Jumbo">Green Jumbo (3.80 kg)</option>
-          </select>
-        </div>
-        <div>
-          <label for="layer">📚 Jumlah Layer</label>
-          <input type="number" id="layer" step="1" value="0">
-        </div>
-      </div>
-
-      <label for="berat">⚖️ Berat TIMBANG 1 BOX (kg)</label>
-      <input type="number" id="berat" step="0.01" placeholder="Contoh: 2.50">
-
-      <button id="hitungBtn">✅ HITUNG & SIMPAN KE CLOUD</button>
-      <button id="resetFormBtn" class="btn-reset">🔄 Reset Form (Kosongkan PO & Brand)</button>
-      <div id="statusMsg" class="status"></div>
+  <!-- ============== KATALOG PRODUK ============== -->
+  <main id="catalogView">
+    <div class="product-grid" id="productGrid"></div>
+    <div id="catalogEmpty" class="empty-state" hidden>
+      <i class="fa-solid fa-box-open"></i>
+      <p>Produk tidak ditemukan</p>
     </div>
+  </main>
 
-    <div class="card" id="hasilCard" style="display:none">
-      <h2>📊 HASIL PERHITUNGAN</h2>
-      <div style="padding:12px; background:#f1f5f9; border-radius:12px">
-        <div><strong>⚖️ Berat Bersih Kertas:</strong> <span id="beratBersih" class="berat-bersih">0</span> kg</div>
-        <div style="margin-top:10px"><strong>📦 JUMLAH BUNDLES:</strong> <span id="jumlahBundles" style="font-size:1.8rem; color:#1e3a8a; font-weight:bold">0</span> bundle</div>
-      </div>
+  <!-- ============== CART DRAWER ============== -->
+  <div class="drawer-overlay" id="cartOverlay"></div>
+  <aside class="drawer" id="cartDrawer">
+    <div class="drawer-header">
+      <h2><i class="fa-solid fa-cart-shopping"></i> Keranjang</h2>
+      <button class="icon-btn" id="closeCartBtn"><i class="fa-solid fa-xmark"></i></button>
     </div>
+    <div class="drawer-body" id="cartItems"></div>
+    <div class="drawer-footer">
+      <div class="summary-row summary-total">
+        <span>Total</span>
+        <span id="cartTotal">Rp 0</span>
+      </div>
+      <button class="btn btn-primary btn-block" id="checkoutBtn">Checkout</button>
+    </div>
+  </aside>
+
+  <!-- ============== CHECKOUT DRAWER ============== -->
+  <div class="drawer-overlay" id="checkoutOverlay"></div>
+  <aside class="drawer" id="checkoutDrawer">
+    <div class="drawer-header">
+      <h2><i class="fa-solid fa-clipboard-list"></i> Checkout</h2>
+      <button class="icon-btn" id="closeCheckoutBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="drawer-body" id="checkoutBody"></div>
+  </aside>
+
+  <!-- ============== RIWAYAT PESANAN DRAWER ============== -->
+  <div class="drawer-overlay" id="ordersOverlay"></div>
+  <aside class="drawer" id="ordersDrawer">
+    <div class="drawer-header">
+      <h2><i class="fa-solid fa-receipt"></i> Pesanan Saya</h2>
+      <button class="icon-btn" id="closeOrdersBtn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="drawer-body" id="ordersBody"></div>
+  </aside>
+
+  <!-- ============== TOAST ============== -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ============== LOADING OVERLAY ============== -->
+  <div class="loading-overlay" id="loadingOverlay" hidden>
+    <div class="spinner"></div>
   </div>
 
-  <!-- HALAMAN 2: RIWAYAT -->
-  <div id="page2" class="page">
-    <div class="card">
-      <h2>📜 RIWAYAT (CLOUD SUPABASE)</h2>
-      <div class="search-row">
-        <input type="text" id="searchInput" placeholder="Cari No. PO atau Brand...">
-        <button id="cariBtn">🔍 Cari</button>
-        <button id="exportExcelBtn" class="btn-export">📎 Export Excel</button>
-        <button id="cetakBtn" class="btn-cetak">🖨️ Cetak Multi Timbang</button>
-      </div>
-      <div class="row-2" style="margin-top:8px;">
-        <button id="urutPOBtn" class="btn-urut">🔼 Urutkan PO (A-Z)</button>
-        <button id="urutPOTerbalikBtn" class="btn-urut">🔽 Urutkan PO (Z-A)</button>
-      </div>
-      <button id="resetCariBtn" class="btn-reset-cari">↺ Reset</button>
-
-      <div style="overflow-x:auto; margin-top:12px">
-        <table id="riwayatTable">
-          <thead>
-            <tr><th><input type="checkbox" id="selectAllCheckbox"></th><th>No</th><th>Tgl</th><th>PO</th><th>Brand</th><th>Size</th><th>GSM</th><th>Leaves</th><th>Bundles</th><th>Aksi</th></tr>
-          </thead>
-          <tbody id="riwayatBody"></tbody>
-        </table>
-      </div>
-      <div class="pagination" id="pagination"></div>
-      <button id="hapusSemuaBtn" class="btn-hapus">🗑️ Hapus Semua Data</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL CETAK -->
-<div id="cetakModal" class="modal">
-  <div class="modal-content">
-    <h3>🖨️ Cetak Multi Timbang</h3>
-    <div class="cetak-option">
-      <label for="cetakMetode">Pilih Metode Cetak:</label>
-      <select id="cetakMetode">
-        <option value="po">📦 Cetak per No. PO</option>
-        <option value="brand">🏷️ Cetak per Brand</option>
-        <option value="tanggal">📅 Cetak per Rentang Tanggal</option>
-        <option value="checklist">✅ Cetak yang di-checklist</option>
-        <option value="semua">📄 Cetak Semua Data</option>
-      </select>
-    </div>
-    <div id="cetakPoInput" class="cetak-option">
-      <label for="cetakPoValue">Masukkan No. PO:</label>
-      <input type="text" id="cetakPoValue" placeholder="Contoh: PO-001">
-    </div>
-    <div id="cetakBrandInput" class="cetak-option" style="display:none;">
-      <label for="cetakBrandValue">Masukkan Brand:</label>
-      <input type="text" id="cetakBrandValue" placeholder="Contoh: RONSON">
-    </div>
-    <div id="cetakTanggalInput" class="cetak-option" style="display:none;">
-      <label>Rentang Tanggal:</label>
-      <input type="date" id="cetakTglAwal"> s/d <input type="date" id="cetakTglAkhir">
-    </div>
-    <button id="prosesCetakBtn">✅ Proses Cetak</button>
-    <button id="closeCetakModalBtn" class="close-modal">❌ Batal</button>
-  </div>
-</div>
-
-<!-- MODAL EDIT -->
-<div id="editModal" class="modal">
-  <div class="modal-content">
-    <h3>✏️ Edit Data</h3>
-    <label for="editTanggal">Tanggal</label>
-    <input type="date" id="editTanggal">
-    <label for="editNoPo">No. PO</label>
-    <input type="text" id="editNoPo">
-    <label for="editBrand">Brand</label>
-    <input type="text" id="editBrand">
-    <label for="editSize">Size Kertas</label>
-    <select id="editSize">
-      <option value="SINGLE 36X69">SINGLE 36X69</option>
-      <option value="1 1/4 44X78">1 1/4 44X78</option>
-      <option value="CLEAR PAPER 1 1/4 44X78">CLEAR PAPER 1 1/4 44X78</option>
-      <option value="KS 54X97">KS 54X97</option>
-      <option value="KSS 44X108">KSS 44X108</option>
-      <option value="KSS SLIM 36X108">KSS SLIM 36X108</option>
-      <option value="SKS 54X108">SKS 54X108</option>
-      <option value="CLEAR PAPER SKS 54X108">CLEAR PAPER SKS 54X108</option>
-    </select>
-    <label for="editGsm">GSM</label>
-    <select id="editGsm"><option value="13">13</option><option value="14">14</option><option value="20">20</option><option value="35">35</option></select>
-    <label for="editBox">Jenis Box</label>
-    <select id="editBox">
-      <option value="White">White</option><option value="White New">White New</option>
-      <option value="Grey">Grey</option><option value="Green Jumbo">Green Jumbo</option>
-    </select>
-    <label for="editBundles">Jumlah Bundles</label>
-    <input type="number" id="editBundles" step="1">
-    <button id="saveEditBtn">💾 Simpan Perubahan</button>
-    <button id="closeModalBtn" class="close-modal">❌ Batal</button>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-<script src="config.js"></script>
-<script src="database.js"></script>
-<script src="utils.js"></script>
-<script src="api.js"></script>
-<script src="ui.js"></script>
-<script src="print.js"></script>
-<script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
