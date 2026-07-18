@@ -16,7 +16,7 @@ const CONFIG = {
   // "Service Role Key" — anon key memang didesain publik, dibatasi
   // oleh kebijakan RLS di Supabase, sama seperti di aplikasi kasir).
   // GANTI nilai di bawah ini dengan anon key project Supabase kamu.
-  SUPABASE_ANON_KEY: 'TEMPEL_ANON_KEY_SUPABASE_KAMU_DI_SINI',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hcmVsZ3NsdXpzaGt3eHdjam9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MDg3MzIsImV4cCI6MjA5ODI4NDczMn0.73CLxhbxhO28UplJU8C1-mtNawlsMegVsORXY7PPzlg',
 
   STORAGE_BUCKET_PRODUCT_IMAGES: 'product-images',
   STORAGE_BUCKET_PAYMENT_PROOFS: 'payment-proofs',
