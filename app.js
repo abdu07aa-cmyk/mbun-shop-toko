@@ -237,8 +237,13 @@ const Catalog = {
 
     grid.innerHTML = list.map(p => this._cardHtml(p)).join('');
 
-    grid.querySelectorAll('[data-add-product]').forEach(card => {
-      card.addEventListener('click', () => Cart.addItem(card.dataset.addProduct));
+    grid.querySelectorAll('[data-add-product]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        Cart.addItem(btn.dataset.addProduct);
+        btn.classList.add('is-bouncing');
+        setTimeout(() => btn.classList.remove('is-bouncing'), 350);
+      });
     });
   },
 
@@ -249,18 +254,19 @@ const Catalog = {
       : `<div class="emoji-fallback">${p.emoji || '📦'}</div>`;
 
     return `
-      <button class="product-card ${outOfStock ? 'is-out-of-stock' : ''}" data-add-product="${p.id}" ${outOfStock ? 'disabled' : ''}>
+      <div class="product-card ${outOfStock ? 'is-out-of-stock' : ''}">
         <div class="product-card-image">
           ${imageBlock}
           ${outOfStock ? '<span class="stock-badge">Habis</span>' : ''}
+          ${!outOfStock ? `<button class="quick-add-btn" data-add-product="${p.id}" aria-label="Tambah ke keranjang"><i class="fa-solid fa-plus"></i></button>` : ''}
         </div>
         <div class="product-card-body">
           <div class="product-card-name">${Utils.escapeHtml(p.name)}</div>
           <div class="product-card-price">${Utils.formatCurrency(p.price)}</div>
           <div class="product-card-stock">${outOfStock ? 'Stok habis' : `Stok: ${p.stock}`}</div>
-          <div class="product-card-add">${outOfStock ? 'Habis' : '+ Keranjang'}</div>
         </div>
-      </button>`;
+
+      </div>`;
   },
 };
 
@@ -283,6 +289,10 @@ const Cart = {
     }
     STATE.saveCart();
     this.render();
+    ['cartBadge', 'navCartBadge'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.classList.add('is-pulsing'); setTimeout(() => el.classList.remove('is-pulsing'), 400); }
+    });
     Utils.showToast(`${product.name} ditambahkan`, 'success', 1500);
   },
 
@@ -309,7 +319,12 @@ const Cart = {
 
   render() {
     const badge = document.getElementById('cartBadge');
-    if (badge) { badge.textContent = STATE.cartCount; badge.hidden = STATE.cartCount === 0; }
+    const navBadge = document.getElementById('navCartBadge');
+    [badge, navBadge].forEach(b => {
+      if (!b) return;
+      b.textContent = STATE.cartCount;
+      b.hidden = STATE.cartCount === 0;
+    });
 
     const itemsEl = document.getElementById('cartItems');
     const totalEl = document.getElementById('cartTotal');
@@ -592,6 +607,25 @@ function initEvents() {
     STATE.searchQuery = e.target.value;
     Catalog.render();
   }, 250));
+
+  // Bottom navigation
+  const setActiveNav = (id) => {
+    document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('is-active'));
+    document.getElementById(id)?.classList.add('is-active');
+  };
+  document.getElementById('navHomeBtn')?.addEventListener('click', () => {
+    Cart.close(); Checkout.close(); Orders.close();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setActiveNav('navHomeBtn');
+  });
+  document.getElementById('navCartBtn')?.addEventListener('click', () => {
+    Cart.open();
+    setActiveNav('navCartBtn');
+  });
+  document.getElementById('navOrdersBtn')?.addEventListener('click', () => {
+    Orders.open();
+    setActiveNav('navOrdersBtn');
+  });
 }
 
 function checkSupabaseConfigured() {
