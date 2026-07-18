@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="description" content="MBUN COLLECTION — Belanja online, ambil sendiri atau diantar">
 <title>MBUN COLLECTION — Toko Online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -12,30 +15,34 @@
 
   <!-- ============== HEADER ============== -->
   <header class="topbar">
-    <div class="topbar-brand">
-      <span class="topbar-logo">🛍️</span>
-      <div>
-        <h1>MBUN COLLECTION</h1>
-        <span>Belanja Hemat, Hidup Nikmat</span>
+    <div class="topbar-row">
+      <div class="topbar-brand">
+        <span class="topbar-logo">🛍️</span>
+        <div>
+          <h1>MBUN COLLECTION</h1>
+          <span>Belanja Hemat, Hidup Nikmat</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" id="ordersBtn" aria-label="Pesanan Saya" title="Pesanan Saya">
+          <i class="fa-solid fa-receipt"></i>
+        </button>
+        <button class="icon-btn" id="cartBtn" aria-label="Keranjang" title="Keranjang">
+          <i class="fa-solid fa-cart-shopping"></i>
+          <span id="cartBadge" class="badge" hidden>0</span>
+        </button>
       </div>
     </div>
-    <div class="topbar-actions">
-      <button class="icon-btn" id="ordersBtn" aria-label="Pesanan Saya" title="Pesanan Saya">
-        <i class="fa-solid fa-receipt"></i>
-      </button>
-      <button class="icon-btn" id="cartBtn" aria-label="Keranjang" title="Keranjang">
-        <i class="fa-solid fa-cart-shopping"></i>
-        <span id="cartBadge" class="badge" hidden>0</span>
-      </button>
+    <div class="search-box">
+      <i class="fa-solid fa-search"></i>
+      <input type="text" id="searchInput" placeholder="Cari sembako, minuman, snack...">
     </div>
   </header>
 
-  <!-- ============== SEARCH & CATEGORY ============== -->
+  <div class="promo-strip">🛵 Ambil sendiri atau diantar &middot; 💰 Bayar transfer, gampang & cepat</div>
+
+  <!-- ============== CATEGORY ============== -->
   <div class="toolbar">
-    <div class="search-box">
-      <i class="fa-solid fa-search"></i>
-      <input type="text" id="searchInput" placeholder="Cari produk...">
-    </div>
     <div class="category-pills" id="categoryPills"></div>
   </div>
 
@@ -47,6 +54,20 @@
       <p>Produk tidak ditemukan</p>
     </div>
   </main>
+
+  <!-- ============== BOTTOM NAV ============== -->
+  <nav class="bottom-nav">
+    <button class="bottom-nav-item is-active" id="navHomeBtn">
+      <i class="fa-solid fa-store"></i><span>Beranda</span>
+    </button>
+    <button class="bottom-nav-item" id="navCartBtn" style="position:relative;">
+      <i class="fa-solid fa-cart-shopping"></i><span>Keranjang</span>
+      <span id="navCartBadge" class="badge" hidden style="top:2px; right:calc(50% - 20px);"></span>
+    </button>
+    <button class="bottom-nav-item" id="navOrdersBtn">
+      <i class="fa-solid fa-receipt"></i><span>Pesanan</span>
+    </button>
+  </nav>
 
   <!-- ============== CART DRAWER ============== -->
   <div class="drawer-overlay" id="cartOverlay"></div>
