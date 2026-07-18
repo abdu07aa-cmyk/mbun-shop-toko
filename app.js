@@ -12,7 +12,11 @@ const CONFIG = {
   SUPABASE_URL: 'https://marelgsluzshkwxwcjod.supabase.co',
   // Anon key disimpan di localStorage supaya tidak perlu ditulis
   // manual di kode (sama seperti pola di aplikasi kasir).
-  SUPABASE_ANON_KEY: localStorage.getItem('toko_supabase_key') || '',
+  // Anon key AMAN ditanam langsung di sini (bukan rahasia seperti
+  // "Service Role Key" — anon key memang didesain publik, dibatasi
+  // oleh kebijakan RLS di Supabase, sama seperti di aplikasi kasir).
+  // GANTI nilai di bawah ini dengan anon key project Supabase kamu.
+  SUPABASE_ANON_KEY: 'TEMPEL_ANON_KEY_SUPABASE_KAMU_DI_SINI',
 
   STORAGE_BUCKET_PRODUCT_IMAGES: 'product-images',
   STORAGE_BUCKET_PAYMENT_PROOFS: 'payment-proofs',
@@ -629,14 +633,9 @@ function initEvents() {
 }
 
 function checkSupabaseConfigured() {
-  if (API.isConfigured()) return true;
-  const key = prompt('Masukkan Supabase Anon Key (sama dengan yang dipakai aplikasi kasir):');
-  if (key) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.SUPABASE_KEY, key.trim());
-    CONFIG.SUPABASE_ANON_KEY = key.trim();
-    return true;
-  }
-  Utils.showToast('Aplikasi butuh Supabase Anon Key untuk berjalan', 'error', 6000);
+  if (API.isConfigured() && CONFIG.SUPABASE_ANON_KEY !== 'TEMPEL_ANON_KEY_SUPABASE_KAMU_DI_SINI') return true;
+  Utils.showToast('Toko belum siap — hubungi pemilik toko (anon key belum diisi).', 'error', 8000);
+  console.error('[Config] SUPABASE_ANON_KEY belum diisi di app.js. Buka file app.js, ganti nilai CONFIG.SUPABASE_ANON_KEY.');
   return false;
 }
 
