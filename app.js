@@ -26,8 +26,8 @@ const CONFIG = {
 
   // GANTI dengan info rekening/e-wallet asli toko kamu.
   PAYMENT_INFO: [
-    { label: 'GoPay', value: ' 0897-3488-963 a.n. MBUN COLLECTION' },
-    { label: 'Transfer BCA', value: '(8415356281) a.n. ABDUL AZIZ' },
+    { label: 'GoPay', value: '0897-3488-963 a.n. MBUN COLLECTION' },
+    { label: 'Transfer BCA', value: '(isi nomor rekening BCA di sini) a.n. MBUN COLLECTION' },
   ],
 
   STORAGE_KEYS: {
@@ -97,6 +97,12 @@ const Utils = {
   showLoading(show) {
     const el = document.getElementById('loadingOverlay');
     if (el) el.hidden = !show;
+  },
+  /** Hash PIN pakai SHA-256 (Web Crypto API) — PIN tidak pernah disimpan sebagai teks polos */
+  async hashPin(pin) {
+    const data = new TextEncoder().encode(String(pin));
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
   },
   compressImage(file, maxDimension = 800, quality = 0.75) {
     return new Promise((resolve, reject) => {
@@ -368,6 +374,147 @@ const Cart = {
 };
 
 /* ---------- CHECKOUT ---------- */
+/* ---------- AUTH (Login/Daftar pakai HP + PIN) ---------- */
+const Auth = {
+  isLoggedIn() {
+    return !!(STATE.customerName && STATE.customerPhone);
+  },
+
+  logout() {
+    STATE.customerName = '';
+    STATE.customerPhone = '';
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.CUSTOMER_NAME);
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.CUSTOMER_PHONE);
+    Utils.showToast('Berhasil keluar', 'info');
+  },
+
+  /**
+   * Render form Masuk/Daftar ke dalam sebuah container. Dipanggil dari
+   * Checkout & Orders — begitu berhasil, callback onSuccess dijalankan.
+   * @param {HTMLElement} container
+   * @param {() => void} onSuccess
+   */
+  renderForm(container, onSuccess) {
+    let mode = 'login'; // 'login' | 'register'
+
+    const draw = () => {
+      container.innerHTML = `
+        <div class="login-box">
+          <i class="fa-solid fa-user"></i>
+        </div>
+        <div class="fulfillment-options" style="margin-bottom:20px;">
+          <button class="fulfillment-option ${mode === 'login' ? 'is-selected' : ''}" data-auth-mode="login">
+            <i class="fa-solid fa-right-to-bracket"></i> Masuk
+          </button>
+          <button class="fulfillment-option ${mode === 'register' ? 'is-selected' : ''}" data-auth-mode="register">
+            <i class="fa-solid fa-user-plus"></i> Daftar
+          </button>
+        </div>
+
+        ${mode === 'register' ? `
+          <div class="form-field"><span>Nama Lengkap</span><input type="text" id="authName" placeholder="Nama kamu"></div>
+        ` : ''}
+        <div class="form-field"><span>Nomor HP (WhatsApp)</span><input type="tel" id="authPhone" placeholder="08xxxxxxxxxx" inputmode="numeric"></div>
+        <div class="form-field">
+          <span>${mode === 'register' ? 'Buat PIN (4 digit)' : 'PIN'}</span>
+          <input type="password" id="authPin" placeholder="••••" maxlength="4" inputmode="numeric">
+        </div>
+        ${mode === 'register' ? `
+          <div class="form-field"><span>Ulangi PIN</span><input type="password" id="authPinConfirm" placeholder="••••" maxlength="4" inputmode="numeric"></div>
+        ` : ''}
+
+        <button class="btn btn-primary btn-block" id="authSubmitBtn">
+          ${mode === 'register' ? 'Daftar & Lanjutkan' : 'Masuk'}
+        </button>
+      `;
+
+      container.querySelectorAll('[data-auth-mode]').forEach(btn => {
+        btn.addEventListener('click', () => { mode = btn.dataset.authMode; draw(); });
+      });
+
+      document.getElementById('authSubmitBtn')?.addEventListener('click', async () => {
+        const phone = document.getElementById('authPhone')?.value.trim();
+        const pin = document.getElementById('authPin')?.value.trim();
+
+        if (!phone || !/^\d{4}$/.test(pin)) {
+          Utils.showToast('Nomor HP & PIN 4 digit wajib diisi', 'error');
+          return;
+        }
+
+        if (mode === 'register') {
+          const name = document.getElementById('authName')?.value.trim();
+          const pinConfirm = document.getElementById('authPinConfirm')?.value.trim();
+          if (!name) { Utils.showToast('Isi nama lengkap dulu', 'error'); return; }
+          if (pin !== pinConfirm) { Utils.showToast('PIN tidak sama', 'error'); return; }
+          await this._register(name, phone, pin, onSuccess);
+        } else {
+          await this._login(phone, pin, onSuccess);
+        }
+      });
+    };
+
+    draw();
+  },
+
+  async _register(name, phone, pin, onSuccess) {
+    Utils.showLoading(true);
+    try {
+      const existing = await API.fetchAll('customers', { phone: `eq.${phone}` });
+      const pinHash = await Utils.hashPin(pin);
+
+      if (existing.length > 0) {
+        if (existing[0].pin_hash) {
+          Utils.showToast('Nomor ini sudah terdaftar. Silakan pilih "Masuk".', 'error', 4000);
+          return;
+        }
+        // Nomor sudah ada (mis. didaftarkan kasir toko), tapi belum
+        // pernah bikin PIN — lengkapi jadi akun toko online.
+        await API.update('customers', { id: `eq.${existing[0].id}` }, { name, pin_hash: pinHash });
+      } else {
+        await API.insert('customers', { name, phone, pin_hash: pinHash, points: 0 });
+      }
+
+      STATE.saveIdentity(name, phone);
+      Utils.showToast(`Selamat datang, ${name}!`, 'success');
+      onSuccess?.();
+    } catch (err) {
+      console.error(err);
+      Utils.showToast('Gagal mendaftar: ' + err.message, 'error');
+    } finally {
+      Utils.showLoading(false);
+    }
+  },
+
+  async _login(phone, pin, onSuccess) {
+    Utils.showLoading(true);
+    try {
+      const found = await API.fetchAll('customers', { phone: `eq.${phone}` });
+      if (found.length === 0) {
+        Utils.showToast('Nomor HP belum terdaftar. Silakan "Daftar" dulu.', 'error', 4000);
+        return;
+      }
+      const customer = found[0];
+      if (!customer.pin_hash) {
+        Utils.showToast('Akun ini belum punya PIN. Silakan "Daftar" untuk membuat PIN.', 'error', 4500);
+        return;
+      }
+      const pinHash = await Utils.hashPin(pin);
+      if (pinHash !== customer.pin_hash) {
+        Utils.showToast('PIN salah', 'error');
+        return;
+      }
+      STATE.saveIdentity(customer.name, customer.phone);
+      Utils.showToast(`Selamat datang kembali, ${customer.name}!`, 'success');
+      onSuccess?.();
+    } catch (err) {
+      console.error(err);
+      Utils.showToast('Gagal masuk: ' + err.message, 'error');
+    } finally {
+      Utils.showLoading(false);
+    }
+  },
+};
+
 const Checkout = {
   open() {
     if (STATE.cart.length === 0) { Utils.showToast('Keranjang masih kosong', 'warning'); return; }
@@ -385,26 +532,9 @@ const Checkout = {
     const body = document.getElementById('checkoutBody');
     if (!body) return;
 
-    // Kalau belum ada identitas (nama+HP), minta isi dulu sebelum lanjut.
-    if (!STATE.customerName || !STATE.customerPhone) {
-      body.innerHTML = `
-        <div class="login-box">
-          <i class="fa-solid fa-user"></i>
-          <p style="margin-bottom: 16px; color: var(--color-text-secondary); font-size:14px;">
-            Isi nama & nomor HP dulu, biar pesanan bisa dilacak dan kamu bisa lihat riwayat belanja.
-          </p>
-        </div>
-        <div class="form-field"><span>Nama Lengkap</span><input type="text" id="ckName" placeholder="Nama kamu"></div>
-        <div class="form-field"><span>Nomor HP (WhatsApp)</span><input type="tel" id="ckPhone" placeholder="08xxxxxxxxxx"></div>
-        <button class="btn btn-primary btn-block" id="ckSaveIdentityBtn">Lanjutkan</button>
-      `;
-      document.getElementById('ckSaveIdentityBtn')?.addEventListener('click', () => {
-        const name = document.getElementById('ckName')?.value.trim();
-        const phone = document.getElementById('ckPhone')?.value.trim();
-        if (!name || !phone) { Utils.showToast('Isi nama dan nomor HP dulu', 'error'); return; }
-        STATE.saveIdentity(name, phone);
-        this.render();
-      });
+    // Kalau belum login, tampilkan form Masuk/Daftar dulu sebelum lanjut checkout.
+    if (!Auth.isLoggedIn()) {
+      Auth.renderForm(body, () => this.render());
       return;
     }
 
@@ -413,7 +543,7 @@ const Checkout = {
         <span>Pemesan</span>
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <strong>${Utils.escapeHtml(STATE.customerName)} — ${Utils.escapeHtml(STATE.customerPhone)}</strong>
-          <button class="btn btn-secondary" id="ckChangeIdentityBtn" style="padding:6px 10px; font-size:11px;">Ganti</button>
+          <button class="btn btn-secondary" id="ckChangeIdentityBtn" style="padding:6px 10px; font-size:11px;">Keluar</button>
         </div>
       </div>
 
@@ -455,9 +585,7 @@ const Checkout = {
     `;
 
     document.getElementById('ckChangeIdentityBtn')?.addEventListener('click', () => {
-      STATE.customerName = ''; STATE.customerPhone = '';
-      localStorage.removeItem(CONFIG.STORAGE_KEYS.CUSTOMER_NAME);
-      localStorage.removeItem(CONFIG.STORAGE_KEYS.CUSTOMER_PHONE);
+      Auth.logout();
       this.render();
     });
 
@@ -545,8 +673,8 @@ const Orders = {
     const body = document.getElementById('ordersBody');
     if (!body) return;
 
-    if (!STATE.customerPhone) {
-      body.innerHTML = `<div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Belum ada riwayat. Checkout dulu buat mulai belanja.</p></div>`;
+    if (!Auth.isLoggedIn()) {
+      Auth.renderForm(body, () => this.load());
       return;
     }
 
@@ -557,8 +685,18 @@ const Orders = {
         order: 'created_at.desc',
       });
 
+      const accountBar = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--color-border);">
+          <div>
+            <strong style="font-size:13px;">${Utils.escapeHtml(STATE.customerName)}</strong><br>
+            <small style="color:var(--color-ink-muted);">${Utils.escapeHtml(STATE.customerPhone)}</small>
+          </div>
+          <button class="btn btn-secondary" id="ordersLogoutBtn" style="padding:6px 10px; font-size:11px;">Keluar</button>
+        </div>`;
+
       if (orders.length === 0) {
-        body.innerHTML = `<div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Belum ada pesanan.</p></div>`;
+        body.innerHTML = accountBar + `<div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Belum ada pesanan.</p></div>`;
+        document.getElementById('ordersLogoutBtn')?.addEventListener('click', () => { Auth.logout(); this.load(); });
         return;
       }
 
@@ -567,7 +705,7 @@ const Orders = {
         siap: 'Siap Diambil/Dikirim', selesai: 'Selesai', dibatalkan: 'Dibatalkan',
       };
 
-      body.innerHTML = orders.map(o => `
+      body.innerHTML = accountBar + orders.map(o => `
         <div class="order-card">
           <div class="order-card-header">
             <div>
@@ -585,6 +723,7 @@ const Orders = {
           </div>
         </div>
       `).join('');
+      document.getElementById('ordersLogoutBtn')?.addEventListener('click', () => { Auth.logout(); this.load(); });
     } catch (err) {
       body.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Gagal memuat riwayat pesanan.</p></div>`;
     } finally {
