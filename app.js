@@ -26,8 +26,8 @@ const CONFIG = {
 
   // GANTI dengan info rekening/e-wallet asli toko kamu.
   PAYMENT_INFO: [
-    { label: 'GoPay', value: '0897-3488-963 a.n. MBUN COLLECTION' },
-    { label: 'Transfer BCA', value: '(isi nomor rekening BCA di sini) a.n. MBUN COLLECTION' },
+    { label: 'GoPay', value: '0897-9502-611 a.n. ABDUL AZIZ' },
+    { label: 'Transfer BCA', value: '(8415597980) a.n. UMMI FATMAH' },
   ],
 
   STORAGE_KEYS: {
