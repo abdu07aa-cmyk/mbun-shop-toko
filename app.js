@@ -4,18 +4,16 @@
    Supabase project yang SAMA dengan aplikasi kasir internal
    (produk & stok otomatis sinkron), tapi kode & tampilannya
    sepenuhnya independen.
+
+   PERUBAHAN KEAMANAN (lihat fix-customers-security.sql):
+   Login & daftar sekarang lewat RPC login_customer / register_customer
+   di database, BUKAN lagi fetch langsung ke tabel `customers`.
+   Ini supaya pin_hash tidak pernah terkirim ke browser siapa pun.
    ===================================================== */
 
 /* ---------- KONFIGURASI ---------- */
 const CONFIG = {
-  // URL project HARUS sama persis dengan aplikasi kasir kamu.
   SUPABASE_URL: 'https://marelgsluzshkwxwcjod.supabase.co',
-  // Anon key disimpan di localStorage supaya tidak perlu ditulis
-  // manual di kode (sama seperti pola di aplikasi kasir).
-  // Anon key AMAN ditanam langsung di sini (bukan rahasia seperti
-  // "Service Role Key" — anon key memang didesain publik, dibatasi
-  // oleh kebijakan RLS di Supabase, sama seperti di aplikasi kasir).
-  // GANTI nilai di bawah ini dengan anon key project Supabase kamu.
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hcmVsZ3NsdXpzaGt3eHdjam9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MDg3MzIsImV4cCI6MjA5ODI4NDczMn0.73CLxhbxhO28UplJU8C1-mtNawlsMegVsORXY7PPzlg',
 
   STORAGE_BUCKET_PRODUCT_IMAGES: 'product-images',
@@ -24,7 +22,6 @@ const CONFIG = {
   CURRENCY_LOCALE: 'id-ID',
   LOW_STOCK_THRESHOLD: 5,
 
-  // GANTI dengan info rekening/e-wallet asli toko kamu.
   PAYMENT_INFO: [
     { label: 'GoPay', value: '0897-9502-611 a.n. ABDUL AZIZ' },
     { label: 'Transfer BCA', value: '(8415597980) a.n. UMMI FATMAH' },
@@ -98,7 +95,6 @@ const Utils = {
     const el = document.getElementById('loadingOverlay');
     if (el) el.hidden = !show;
   },
-  /** Hash PIN pakai SHA-256 (Web Crypto API) — PIN tidak pernah disimpan sebagai teks polos */
   async hashPin(pin) {
     const data = new TextEncoder().encode(String(pin));
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -127,7 +123,7 @@ const Utils = {
   },
 };
 
-/* ---------- API (Supabase REST + Storage) ---------- */
+/* ---------- API (Supabase REST + Storage + RPC) ---------- */
 const API = {
   _headers(returnRepresentation = false) {
     const h = {
@@ -167,6 +163,19 @@ const API = {
       method: 'PATCH', headers: this._headers(true), body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`Gagal memperbarui ${table}: ${res.status}`);
+    return res.json();
+  },
+
+  /** Panggil fungsi database (RPC). Dipakai untuk login/daftar yang aman
+   *  supaya pin_hash tidak pernah lewat query tabel langsung. */
+  async rpc(fnName, payload) {
+    const res = await fetch(`${CONFIG.SUPABASE_REST_URL}/rpc/${fnName}`, {
+      method: 'POST', headers: this._headers(true), body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.message || `RPC ${fnName} gagal: ${res.status}`);
+    }
     return res.json();
   },
 
@@ -374,7 +383,7 @@ const Cart = {
 };
 
 /* ---------- CHECKOUT ---------- */
-/* ---------- AUTH (Login/Daftar pakai HP + PIN) ---------- */
+/* ---------- AUTH (Login/Daftar pakai HP + PIN, lewat RPC aman) ---------- */
 const Auth = {
   isLoggedIn() {
     return !!(STATE.customerName && STATE.customerPhone);
@@ -388,12 +397,6 @@ const Auth = {
     Utils.showToast('Berhasil keluar', 'info');
   },
 
-  /**
-   * Render form Masuk/Daftar ke dalam sebuah container. Dipanggil dari
-   * Checkout & Orders — begitu berhasil, callback onSuccess dijalankan.
-   * @param {HTMLElement} container
-   * @param {() => void} onSuccess
-   */
   renderForm(container, onSuccess) {
     let mode = 'login'; // 'login' | 'register'
 
@@ -456,59 +459,51 @@ const Auth = {
     draw();
   },
 
+  /** Daftar lewat RPC register_customer — pin_hash dihitung di HP,
+   *  lalu dicek/disimpan di database. Tidak ada query tabel langsung. */
   async _register(name, phone, pin, onSuccess) {
     Utils.showLoading(true);
     try {
-      const existing = await API.fetchAll('customers', { phone: `eq.${phone}` });
       const pinHash = await Utils.hashPin(pin);
-
-      if (existing.length > 0) {
-        if (existing[0].pin_hash) {
-          Utils.showToast('Nomor ini sudah terdaftar. Silakan pilih "Masuk".', 'error', 4000);
-          return;
-        }
-        // Nomor sudah ada (mis. didaftarkan kasir toko), tapi belum
-        // pernah bikin PIN — lengkapi jadi akun toko online.
-        await API.update('customers', { id: `eq.${existing[0].id}` }, { name, pin_hash: pinHash });
-      } else {
-        await API.insert('customers', { name, phone, pin_hash: pinHash, points: 0 });
-      }
-
-      STATE.saveIdentity(name, phone);
-      Utils.showToast(`Selamat datang, ${name}!`, 'success');
+      const rows = await API.rpc('register_customer', {
+        p_name: name, p_phone: phone, p_pin_hash: pinHash,
+      });
+      const customer = rows[0];
+      STATE.saveIdentity(customer.name, customer.phone);
+      Utils.showToast(`Selamat datang, ${customer.name}!`, 'success');
       onSuccess?.();
     } catch (err) {
       console.error(err);
-      Utils.showToast('Gagal mendaftar: ' + err.message, 'error');
+      const msg = String(err.message).includes('PHONE_ALREADY_REGISTERED')
+        ? 'Nomor ini sudah terdaftar. Silakan pilih "Masuk".'
+        : 'Gagal mendaftar: ' + err.message;
+      Utils.showToast(msg, 'error', 4000);
     } finally {
       Utils.showLoading(false);
     }
   },
 
+  /** Masuk lewat RPC login_customer — PIN dicocokkan di database,
+   *  respons TIDAK PERNAH berisi pin_hash. */
   async _login(phone, pin, onSuccess) {
     Utils.showLoading(true);
     try {
-      const found = await API.fetchAll('customers', { phone: `eq.${phone}` });
-      if (found.length === 0) {
-        Utils.showToast('Nomor HP belum terdaftar. Silakan "Daftar" dulu.', 'error', 4000);
-        return;
-      }
-      const customer = found[0];
-      if (!customer.pin_hash) {
-        Utils.showToast('Akun ini belum punya PIN. Silakan "Daftar" untuk membuat PIN.', 'error', 4500);
-        return;
-      }
       const pinHash = await Utils.hashPin(pin);
-      if (pinHash !== customer.pin_hash) {
-        Utils.showToast('PIN salah', 'error');
-        return;
-      }
+      const rows = await API.rpc('login_customer', {
+        p_phone: phone, p_pin_hash: pinHash,
+      });
+      const customer = rows[0];
       STATE.saveIdentity(customer.name, customer.phone);
       Utils.showToast(`Selamat datang kembali, ${customer.name}!`, 'success');
       onSuccess?.();
     } catch (err) {
       console.error(err);
-      Utils.showToast('Gagal masuk: ' + err.message, 'error');
+      const m = String(err.message);
+      let msg = 'Gagal masuk: ' + err.message;
+      if (m.includes('PHONE_NOT_FOUND')) msg = 'Nomor HP belum terdaftar. Silakan "Daftar" dulu.';
+      else if (m.includes('NO_PIN_SET')) msg = 'Akun ini belum punya PIN. Silakan "Daftar" untuk membuat PIN.';
+      else if (m.includes('WRONG_PIN')) msg = 'PIN salah';
+      Utils.showToast(msg, 'error', 4000);
     } finally {
       Utils.showLoading(false);
     }
@@ -532,7 +527,6 @@ const Checkout = {
     const body = document.getElementById('checkoutBody');
     if (!body) return;
 
-    // Kalau belum login, tampilkan form Masuk/Daftar dulu sebelum lanjut checkout.
     if (!Auth.isLoggedIn()) {
       Auth.renderForm(body, () => this.render());
       return;
@@ -751,7 +745,6 @@ function initEvents() {
     Catalog.render();
   }, 250));
 
-  // Bottom navigation
   const setActiveNav = (id) => {
     document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('is-active'));
     document.getElementById(id)?.classList.add('is-active');
